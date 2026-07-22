@@ -78,7 +78,7 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return R * c
 
-# --- Auto-Absent (11:59 PM IST) ---
+# --- Auto-Absent (12:01 PM IST) ---
 def mark_absent_students():
     today = datetime.now(IST).date()
     conn = get_db_connection()
@@ -234,10 +234,12 @@ def mark_attendance():
     current_time = now.time()
     current_date = now.date()
 
-    if current_time < time(12, 0):
-        return jsonify({'success': False, 'message': 'Attendance window starts at 12:00 PM IST.'}), 400
+    if current_time < time(8, 0):
+        return jsonify({'success': False, 'message': 'Attendance window starts at 8:00 AM IST.'}), 400
+    if current_time >= time(12, 0):
+        return jsonify({'success': False, 'message': 'Attendance window closed. Timeout.'}), 400
 
-    status = 'Present' if current_time < time(13, 0) else 'Late'
+    status = 'Present' if current_time < time(9, 0) else 'Late'
 
     conn = get_db_connection()
     if not conn:
@@ -441,8 +443,8 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(
     mark_absent_students,
     'cron',
-    hour=23,
-    minute=59,
+    hour=12,
+    minute=1,
     timezone=IST
 )
 scheduler.start()
