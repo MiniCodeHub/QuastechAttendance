@@ -4,7 +4,9 @@ import math
 from datetime import datetime, date, time, timedelta
 from io import BytesIO
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template, send_file
+from flask_cors import CORS
 app = Flask(__name__, template_folder='../frontend/templates', static_folder='../frontend/static')
+CORS(app)
 import pymysql
 from pymysql.cursors import DictCursor
 import pytz
@@ -20,16 +22,36 @@ load_dotenv()
 
 app.secret_key = os.urandom(24)
 
+import urllib.parse
+
 # --- Configuration ---
-DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '221007',   # CHANGE to your MySQL password
-    'database': 'quastech_db',
-    'charset': 'utf8mb4',
-    'cursorclass': DictCursor,
-    'autocommit': True
-}
+database_url = os.environ.get('DATABASE_URL')
+
+if database_url:
+    # Use Aiven or Render DATABASE_URL
+    url = urllib.parse.urlparse(database_url)
+    DB_CONFIG = {
+        'host': url.hostname,
+        'user': url.username,
+        'password': url.password,
+        'database': url.path[1:],  # Remove leading slash
+        'port': url.port or 3306,
+        'charset': 'utf8mb4',
+        'cursorclass': DictCursor,
+        'autocommit': True,
+        'ssl': {}  # Aiven requires SSL, empty dict enables it in PyMySQL
+    }
+else:
+    # Fallback for local development
+    DB_CONFIG = {
+        'host': 'localhost',
+        'user': 'root',
+        'password': '221007',   # CHANGE to your MySQL password
+        'database': 'quastech_db',
+        'charset': 'utf8mb4',
+        'cursorclass': DictCursor,
+        'autocommit': True
+    }
 
 # College GPS coordinates (replace with your actual values)
 COLLEGE_LAT = 19.148643
