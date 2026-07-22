@@ -34,8 +34,9 @@ document.getElementById("registrationForm").addEventListener("submit", async (e)
     const year = yearRadio.value;
 
     const payload = { name, registration_number: regNum, mobile, year };
+    const baseUrl = typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : "";
     try {
-        const res = await fetch("/register", {
+        const res = await fetch(baseUrl + "/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
@@ -58,8 +59,10 @@ document.getElementById("attendanceForm").addEventListener("submit", async (e) =
     e.preventDefault();
     const registration_number = document.getElementById("registration_number").value.trim().toUpperCase();
 
+    const baseUrl = typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : "";
+
     if (registration_number === "ADMIN") {
-        window.location.href = "/admin";
+        window.location.href = baseUrl + "/admin";
         return;
     }
 
@@ -93,7 +96,7 @@ document.getElementById("attendanceForm").addEventListener("submit", async (e) =
         };
 
         try {
-            const res = await fetch("/mark_attendance", {
+            const res = await fetch(baseUrl + "/mark_attendance", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
