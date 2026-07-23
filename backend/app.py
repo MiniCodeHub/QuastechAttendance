@@ -54,8 +54,8 @@ else:
     }
 
 # College GPS coordinates (replace with your actual values)
-COLLEGE_LAT = 19.148643
-COLLEGE_LON = 73.036216
+COLLEGE_LAT = 19.18711
+COLLEGE_LON = 72.97272
 GPS_RADIUS_METERS = 200
 
 IST = pytz.timezone('Asia/Kolkata')
