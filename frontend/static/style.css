@@ -1,0 +1,217 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.container {
+    width: 100%;
+    max-width: 500px;
+    background: white;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    text-align: center;
+}
+
+.text-logo {
+    font-size: 36px;
+    font-weight: bold;
+    color: #667eea;
+    margin-bottom: 10px;
+}
+
+.tagline {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 30px;
+}
+
+h2 {
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 24px;
+}
+
+.form-card {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+label {
+    text-align: left;
+    font-weight: 500;
+    color: #333;
+    margin-top: 10px;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="tel"],
+input[type="email"],
+select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="tel"]:focus,
+input[type="email"]:focus,
+select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+}
+
+.year {
+    display: flex;
+    gap: 15px;
+    justify-content: space-around;
+    margin-top: 10px;
+}
+
+.year label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.year input[type="radio"] {
+    width: auto;
+    margin: 0;
+}
+
+button[type="submit"],
+.btn {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    display: inline-block;
+    margin: 5px;
+}
+
+button[type="submit"]:hover,
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+button[type="submit"]:active,
+.btn:active {
+    transform: translateY(0);
+}
+
+.auth-link {
+    margin-top: 20px;
+    color: #666;
+    font-size: 14px;
+}
+
+.auth-link a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.auth-link a:hover {
+    text-decoration: underline;
+}
+
+#signupMessage,
+#loginMessage,
+#attendanceMessage {
+    min-height: 20px;
+    font-size: 14px;
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 6px;
+}
+
+.success {
+    color: #27ae60;
+    background-color: #d5f4e6;
+    border: 1px solid #27ae60;
+}
+
+.error {
+    color: #e74c3c;
+    background-color: #fadbd8;
+    border: 1px solid #e74c3c;
+}
+
+.auth-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+    flex-wrap: wrap;
+}
+
+.btn.primary {
+    flex: 1;
+    min-width: 120px;
+}
+
+.btn.secondary {
+    flex: 1;
+    min-width: 120px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.btn.secondary:hover {
+    box-shadow: 0 5px 20px rgba(245, 87, 108, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .container {
+        padding: 30px 20px;
+    }
+
+    .text-logo {
+        font-size: 28px;
+    }
+
+    .auth-buttons {
+        flex-direction: column;
+    }
+
+    .btn.primary,
+    .btn.secondary {
+        flex: none;
+        width: 100%;
+    }
+
+    .year {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .year label {
+        justify-content: flex-start;
+    }
+}

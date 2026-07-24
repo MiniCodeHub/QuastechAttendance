@@ -2,450 +2,89 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | QUASTECH</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-color: #0b0f19;
-            --card-bg: #151c2c;
-            --card-border: #242f47;
-            --text-primary: #f3f4f6;
-            --text-secondary: #9ca3af;
-            --primary: #3b82f6;
-            --primary-glow: rgba(59, 130, 246, 0.15);
-            --success: #10b981;
-            --success-glow: rgba(16, 185, 129, 0.15);
-            --danger: #ef4444;
-            --danger-hover: #dc2626;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            min-height: 100vh;
-            padding: 2rem 1.5rem;
-            line-height: 1.5;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        /* Glassmorphism Header */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1.5rem 2rem;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(10px);
-        }
-
-        .logo-text {
-            font-size: 1.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #60a5fa, #3b82f6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -0.5px;
-        }
-
-        /* Buttons */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.625rem 1.25rem;
-            font-size: 0.875rem;
-            font-weight: 600;
-            border-radius: 8px;
-            text-decoration: none;
-            cursor: pointer;
-            transition: var(--transition);
-            border: none;
-        }
-
-        .btn-primary {
-            background-color: var(--primary);
-            color: white;
-            box-shadow: 0 4px 14px var(--primary-glow);
-        }
-
-        .btn-primary:hover {
-            background-color: #2563eb;
-            transform: translateY(-1px);
-        }
-
-        .btn-danger {
-            background-color: var(--danger);
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background-color: var(--danger-hover);
-            transform: translateY(-1px);
-        }
-
-        /* Info Banner / Errors */
-        .error-banner {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            color: #f87171;
-            padding: 1rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-
-        /* Dashboard Overview Grid */
-        .overview-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2.5rem;
-        }
-
-        .card {
-            background-color: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            transition: var(--transition);
-        }
-
-        .card:hover {
-            border-color: #4b5563;
-            transform: translateY(-2px);
-        }
-
-        .card-title {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 0.5rem;
-        }
-
-        .card-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        /* Section Layouts */
-        section {
-            margin-bottom: 3rem;
-        }
-
-        .section-header {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        /* Modern Tables */
-        .table-container {
-            background-color: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-        }
-
-        th {
-            background-color: rgba(36, 47, 71, 0.5);
-            color: var(--text-secondary);
-            font-weight: 600;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--card-border);
-        }
-
-        td {
-            padding: 1rem 1.5rem;
-            font-size: 0.875rem;
-            border-bottom: 1px solid var(--card-border);
-            color: var(--text-primary);
-        }
-
-        tr:last-child td {
-            border-bottom: none;
-        }
-
-        tr:hover td {
-            background-color: rgba(255, 255, 255, 0.02);
-        }
-
-        /* Badges */
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.25rem 0.75rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            border-radius: 9999px;
-            text-transform: uppercase;
-        }
-
-        .badge-year {
-            background-color: var(--primary-glow);
-            color: #60a5fa;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-        }
-
-        .badge-present {
-            background-color: var(--success-glow);
-            color: #34d399;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .badge-late {
-            background-color: rgba(245, 158, 11, 0.1);
-            color: #fbbf24;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-
-        .badge-absent {
-            background-color: rgba(239, 68, 68, 0.1);
-            color: #f87171;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        /* Empty states */
-        .empty-row td {
-            text-align: center;
-            color: var(--text-secondary);
-            padding: 3rem 1.5rem;
-        }
-
-        /* Login Layout */
-        .login-wrapper {
-            min-height: 80vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .login-card {
-            width: 100%;
-            max-width: 420px;
-            background-color: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 2.5rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-
-        .login-card h2 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            text-align: center;
-        }
-
-        .login-card p {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-        }
-
-        .form-input {
-            width: 100%;
-            background-color: rgba(11, 15, 25, 0.5);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            transition: var(--transition);
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-        }
-
-        .login-btn {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: var(--primary);
-            color: white;
-            font-weight: 600;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: var(--transition);
-            margin-top: 1rem;
-        }
-
-        .login-btn:hover {
-            background-color: #2563eb;
-        }
-    </style>
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
 </head>
 <body>
 <div class="container">
     {% if session.admin_logged_in %}
-        <header>
-            <div class="logo-text">QUASTECH ADMIN</div>
-            <div>
-                <a href="{{ url_for('download_full_report') }}" class="btn btn-primary" style="margin-right: 0.75rem;">📥 Download Excel Report</a>
-                <a href="{{ url_for('admin_logout') }}" class="btn btn-danger">Logout</a>
-            </div>
-        </header>
+        <div class="header">
+            <h1>📊 Admin Panel</h1>
+            <a href="{{ url_for('admin_logout') }}" class="btn logout">Logout</a>
+        </div>
 
-        {% if db_error %}
-            <div class="error-banner">
-                Error connecting to database: {{ db_error }}
-            </div>
-        {% endif %}
+        <a href="{{ url_for('download_full_report') }}" class="btn">📥 Download Report (Excel)</a>
 
-        <!-- Dashboard Analytics Overview -->
-        <div class="overview-grid">
-            <div class="card">
-                <div class="card-title">Total Registered Students</div>
-                <div class="card-value">{{ registrations|length }}</div>
-            </div>
-            <div class="card">
-                <div class="card-title">Attendance Logs</div>
-                <div class="card-value">{{ attendance|length }}</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Registrations</h3>
+                <p>{{ total_registrations }}</p>
             </div>
         </div>
 
-        <!-- Registrations Section -->
-        <section>
-            <div class="section-header">Registrations</div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Registration Number</th>
-                            <th>Name</th>
-                            <th>Mobile</th>
-                            <th>Year</th>
-                            <th>Registered At</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for reg in registrations %}
-                        <tr>
-                            <td><strong>{{ reg.registration_number }}</strong></td>
-                            <td>{{ reg.name }}</td>
-                            <td>{{ reg.mobile }}</td>
-                            <td><span class="badge badge-year">{{ reg.year }}</span></td>
-                            <td style="color: var(--text-secondary);">{{ reg.registered_at.strftime('%Y-%m-%d %H:%M:%S') if reg.registered_at else '' }}</td>
-                        </tr>
-                        {% else %}
-                        <tr class="empty-row">
-                            <td colspan="5">No registrations found.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </section>
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="🔍 Search by Name or Registration Number..." onkeyup="searchStudents()">
+        </div>
 
-        <!-- Attendance Records Section -->
-        <section>
-            <div class="section-header">Attendance Records</div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Registration Number</th>
-                            <th>Name</th>
-                            <th>Date</th>
-                            <th>Time In</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for att in attendance %}
-                        <tr>
-                            <td><strong>{{ att.registration_number }}</strong></td>
-                            <td>{{ att.name }}</td>
-                            <td>{{ att.date.strftime('%Y-%m-%d') if att.date else '' }}</td>
-                            <td style="color: var(--text-secondary);">{{ att.time_in if att.time_in else 'N/A' }}</td>
-                            <td>
-                                {% if att.status == 'Present' %}
-                                    <span class="badge badge-present">{{ att.status }}</span>
-                                {% elif att.status == 'Late' %}
-                                    <span class="badge badge-late">{{ att.status }}</span>
-                                {% else %}
-                                    <span class="badge badge-absent">{{ att.status }}</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr class="empty-row">
-                            <td colspan="5">No attendance records found.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <h2>Registrations</h2>
+        <div id="registrationsTable">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Registration Number</th>
+                        <th>Name</th>
+                        <th>Mobile</th>
+                        <th>Year</th>
+                        <th>Course</th>
+                        <th>Password</th>
+                        <th>Registered At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for reg in registrations %}
+                    <tr>
+                        <td>{{ reg.registration_number }}</td>
+                        <td>{{ reg.name }}</td>
+                        <td>{{ reg.mobile }}</td>
+                        <td>{{ reg.year }}</td>
+                        <td>{{ reg.course or 'BCA' }}</td>
+                        <td>{{ reg.password }}</td>
+                        <td>{{ reg.registered_at.strftime('%Y-%m-%d %H:%M:%S') if reg.registered_at else '' }}</td>
+                        <td>
+                            <button class="btn btn-reset" onclick="openResetModal('{{ reg.registration_number }}', '{{ reg.name }}')">🔑 Reset</button>
+                            <button class="btn btn-delete" onclick="deleteRecord('{{ reg.registration_number }}')">🗑️ Delete</button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8">No registrations found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Reset Password Modal -->
+        <div id="resetModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeResetModal()">&times;</span>
+                <h2>Reset Password</h2>
+                <p id="studentInfo"></p>
+                <label>New Password:</label>
+                <input type="password" id="newPassword" placeholder="Enter new password" required>
+                <button class="modal-btn" onclick="confirmResetPassword()">Reset Password</button>
             </div>
-        </section>
+        </div>
+
+        <script src="{{ url_for('static', filename='admin.js') }}"></script>
     {% else %}
-        <div class="login-wrapper">
-            <div class="login-card">
-                <h2>Admin Login</h2>
-                <p>Enter password to access dashboard</p>
-                {% if error %}
-                    <div class="error-banner" style="text-align: center; margin-bottom: 1.5rem;">
-                        {{ error }}
-                    </div>
-                {% endif %}
-                <form method="POST">
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <input type="password" id="password" name="password" class="form-input" placeholder="Enter password" required>
-                    </div>
-                    <button type="submit" class="login-btn">Sign In</button>
-                </form>
-            </div>
+        <div class="login-box">
+            <h2>Admin Login</h2>
+            {% if error %}<div style="color:red;">{{ error }}</div>{% endif %}
+            <form method="POST">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="Enter password" required>
+                <button type="submit">Login</button>
+            </form>
         </div>
     {% endif %}
 </div>

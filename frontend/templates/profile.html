@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUASTECH Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='profile.css') }}">
+</head>
+<body class="home-page">
+    <div class="home-header">
+        <div class="home-brand">
+            <div class="text-logo">QUASTECH</div>
+            <div class="tagline">ISO 9001:2015 | Future through Innovation</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="profile-card">
+            <h2>Profile</h2>
+
+            <div class="profile-details">
+                <div class="profile-row">
+                    <span class="profile-label">Name</span>
+                    <span class="profile-value">{{ student_data.name }}</span>
+                </div>
+                <div class="profile-row">
+                    <span class="profile-label">Registration</span>
+                    <span class="profile-value">{{ student_data.registration_number }}</span>
+                </div>
+                <div class="profile-row">
+                    <span class="profile-label">Year</span>
+                    <span class="profile-value">{{ student_data.year }}</span>
+                </div>
+                <div class="profile-row">
+                    <span class="profile-label">Mobile</span>
+                    <span class="profile-value">{{ student_data.mobile }}</span>
+                </div>
+                <div class="profile-row">
+                    <span class="profile-label">Course</span>
+                    <span class="profile-value">{{ student_data.course or 'BCA' }}</span>
+                </div>
+            </div>
+
+            <div style="text-align:center; margin-top:15px;">
+                <a href="{{ url_for('dashboard') }}" style="color:#007bff; text-decoration:none;">⬅ Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='profile.js') }}"></script>
+</body>
+</html>
