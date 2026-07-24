@@ -264,3 +264,81 @@ th {
 .btn-delete:hover {
     background: #b91c1c;
 }
+
+.admin-container,
+.admin-panel,
+.admin-header,
+.admin-grid,
+.admin-card {
+  box-sizing: border-box;
+}
+
+.admin-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.admin-card {
+  flex: 1 1 320px;
+  min-width: 280px;
+}
+
+.admin-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  min-width: 600px;
+}
+
+@media (max-width: 1024px) {
+  .admin-grid {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-header,
+  .admin-actions,
+  .admin-card {
+    width: 100%;
+  }
+
+  .admin-card {
+    padding: 0.9rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-header h1,
+  .admin-header .subtitle {
+    font-size: 1rem;
+  }
+
+  .admin-table td,
+  .admin-table th {
+    padding: 0.5rem 0.6rem;
+  }
+}
+
+/* make registration number input text visible */
+.login-box input,
+.search-bar input,
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="email"],
+select,
+textarea {
+    color: #111;
+    background: #fff;
+}
+
+.login-box input::placeholder,
+.search-bar input::placeholder,
+input::placeholder {
+    color: #999;
+}

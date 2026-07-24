@@ -1,7 +1,6 @@
-Flask==2.3.3
-pymysql==1.1.0
-python-dotenv==1.0.0
-pytz==2023.3
-openpyxl==3.1.2
-APScheduler==3.10.4
-Werkzeug==2.3.7
+flask
+pymysql
+python-dotenv
+pytz
+openpyxl
+apscheduler

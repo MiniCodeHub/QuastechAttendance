@@ -1,7 +1,6 @@
 import os
 import re
 import math
-import urllib.parse
 from datetime import datetime, date, time, timedelta
 from io import BytesIO
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_file
@@ -15,13 +14,12 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
-# ✅ CORRECTED PATHS FOR YOUR FOLDER STRUCTURE
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # backend folder
-PROJECT_ROOT = os.path.dirname(BASE_DIR)  # New folder
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
 TEMPLATES_DIR = os.path.join(PROJECT_ROOT, 'frontend', 'templates')
-STATIC_DIR = os.path.join(PROJECT_ROOT, 'frontend', 'static')  # <-- correct path
+STATIC_DIR = os.path.join(PROJECT_ROOT, 'frontend', 'static')
 
 app = Flask(
     __name__,
@@ -30,42 +28,25 @@ app = Flask(
 )
 app.secret_key = os.urandom(24)
 
-print(f"✅ Base Dir: {BASE_DIR}")
-print(f"✅ Templates Dir: {TEMPLATES_DIR}")
-print(f"✅ Static Dir: {STATIC_DIR}")
+# --- Old configuration kept ---
+DB_CONFIG = {
+    "host": "gateway01.ap-southeast-1.prod.aws.tidbcloud.com",
+    "port": 4000,
+    "user": "3dtXqyjkbNdTH2t.root",
+    "password": "vzuHZOlyqLj195LO",
+    "database": "defaultdb",
+    "charset": "utf8mb4",
+    "cursorclass": DictCursor,
+    "autocommit": True,
+    "ssl_verify_cert": True,
+    "ssl_verify_identity": True,
+    "ssl_ca": os.path.join(BASE_DIR, "isrgrootx1.pem")
+}
 
-# --- Configuration ---
-database_url = os.environ.get('DATABASE_URL')
+ADMIN_CODE = 'admin1246'
 
-if database_url:
-    # Use Aiven or Render DATABASE_URL
-    url = urllib.parse.urlparse(database_url)
-    DB_CONFIG = {
-        'host': url.hostname,
-        'user': url.username,
-        'password': url.password,
-        'database': url.path[1:],  # Remove leading slash
-        'port': url.port or 3306,
-        'charset': 'utf8mb4',
-        'cursorclass': DictCursor,
-        'autocommit': True,
-        'ssl': {}  # Aiven requires SSL, empty dict enables it in PyMySQL
-    }
-else:
-    # Fallback for local development
-    DB_CONFIG = {
-        'host': 'localhost',
-        'user': 'root',
-        'password': '221007',   # CHANGE to your MySQL password
-        'database': 'quastech_db',
-        'charset': 'utf8mb4',
-        'cursorclass': DictCursor,
-        'autocommit': True
-    }
-
-# College GPS coordinates (replace with your actual values)
-COLLEGE_LAT = 19.148643
-COLLEGE_LON = 73.036216
+COLLEGE_LAT = 19.18711
+COLLEGE_LON = 72.97272
 GPS_RADIUS_METERS = 200
 
 IST = pytz.timezone('Asia/Kolkata')
@@ -76,32 +57,6 @@ def get_db_connection():
     except Exception as e:
         print(f"❌ Database connection error: {e}")
         return None
-
-# --- College GPS coordinates ---
-COLLEGE_LAT = 19.29603
-COLLEGE_LON = 73.20599
-GPS_RADIUS_METERS = 200
-
-IST = pytz.timezone('Asia/Kolkata')
-ADMIN_CODE = 'admin1246'
-
-# --- Password Functions (Plaintext) ---
-def hash_password(password):
-    return password
-
-def check_password(password, stored):
-    return password == stored
-
-# --- Haversine Distance ---
-def haversine(lat1, lon1, lat2, lon2):
-    R = 6371000
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-    return R * c
 
 # --- Auto-Absent (10:01 PM IST) ---
 def mark_absent_students():
