@@ -33,20 +33,41 @@ print(f"✅ Base Dir: {BASE_DIR}")
 print(f"✅ Templates Dir: {TEMPLATES_DIR}")
 print(f"✅ Static Dir: {STATIC_DIR}")
 
-# --- TiDB Cloud Configuration ---
-DB_CONFIG = {
-    "host": "gateway01.ap-southeast-1.prod.aws.tidbcloud.com",
-    "port": 4000,
-    "user": "3dtXqyjkbNdTH2t.root",
-    "password": "vzuHZOlyqLj195LO",
-    "database": "defaultdb",
-    "charset": "utf8mb4",
-    "cursorclass": DictCursor,
-    "autocommit": True,
-    "ssl_verify_cert": True,
-    "ssl_verify_identity": True,
-    "ssl_ca": os.path.join(BASE_DIR, "isrgrootx1.pem")
-}
+# --- Configuration ---
+database_url = os.environ.get('DATABASE_URL')
+
+if database_url:
+    # Use Aiven or Render DATABASE_URL
+    url = urllib.parse.urlparse(database_url)
+    DB_CONFIG = {
+        'host': url.hostname,
+        'user': url.username,
+        'password': url.password,
+        'database': url.path[1:],  # Remove leading slash
+        'port': url.port or 3306,
+        'charset': 'utf8mb4',
+        'cursorclass': DictCursor,
+        'autocommit': True,
+        'ssl': {}  # Aiven requires SSL, empty dict enables it in PyMySQL
+    }
+else:
+    # Fallback for local development
+    DB_CONFIG = {
+        'host': 'localhost',
+        'user': 'root',
+        'password': '221007',   # CHANGE to your MySQL password
+        'database': 'quastech_db',
+        'charset': 'utf8mb4',
+        'cursorclass': DictCursor,
+        'autocommit': True
+    }
+
+# College GPS coordinates (replace with your actual values)
+COLLEGE_LAT = 19.148643
+COLLEGE_LON = 73.036216
+GPS_RADIUS_METERS = 200
+
+IST = pytz.timezone('Asia/Kolkata')
 
 def get_db_connection():
     try:
