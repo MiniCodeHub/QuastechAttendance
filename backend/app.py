@@ -198,12 +198,18 @@ def signup():
             confirm_password = request.form.get('confirm_password', '').strip()
 
         # Convert year to display format
-        year_map = {'1': '1st Year', '2': '2nd Year', '3': '3rd Year'}
-        year_display = year_map.get(year, year)
+        year_map = {'1': 'FYBCA', '2': 'SYBCA', '3': 'TYBCA'}
+        year_value = year_map.get(year, year).strip()
 
         # Validation
-        if not all([name, registration_number, mobile, year, password, confirm_password]):
+        if not all([name, registration_number, mobile, year_value, password, confirm_password]):
             error_msg = 'All fields are required'
+            if request.is_json:
+                return jsonify({'success': False, 'message': error_msg})
+            return render_template('signup.html', error=error_msg)
+
+        if year_value not in {'FYBCA', 'SYBCA', 'TYBCA'}:
+            error_msg = 'Invalid year'
             if request.is_json:
                 return jsonify({'success': False, 'message': error_msg})
             return render_template('signup.html', error=error_msg)
@@ -251,7 +257,7 @@ def signup():
                     INSERT INTO registrations 
                     (name, registration_number, mobile, year, course, password, registered_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (name, registration_number, mobile, year_display, course, password, datetime.now(IST)))
+                """, (name, registration_number, mobile, year_value, course, password, datetime.now(IST)))
 
                 conn.commit()
                 
