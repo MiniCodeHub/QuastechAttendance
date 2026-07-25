@@ -32,91 +32,96 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize theme on page load
     initializeTheme();
 
-    // --- Calendar Functions ---
-    let currentMonth = new Date().getMonth();
-    let currentYear = new Date().getFullYear();
+    // --- Calendar Functions (Only if calendar elements exist) ---
+    const calendarMonthElement = document.getElementById('calendarMonth');
+    const calendarGridElement = document.getElementById('calendarGrid');
 
-    function loadCalendar(year, month) {
-        if (year === undefined) year = currentYear;
-        if (month === undefined) month = currentMonth;
+    if (calendarMonthElement && calendarGridElement) {
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
 
-        document.getElementById('calendarMonth').textContent = 
-            new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' });
+        function loadCalendar(year, month) {
+            if (year === undefined) year = currentYear;
+            if (month === undefined) month = currentMonth;
 
-        const grid = document.getElementById('calendarGrid');
-        grid.innerHTML = '';
+            calendarMonthElement.textContent = 
+                new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' });
 
-        // Fetch attendance data
-        fetch(`/calendar_data?year=${year}&month=${month+1}`)
-            .then(res => res.json())
-            .then(data => {
-                if (!data.success) return;
-                const attendance = data.data;
+            const grid = calendarGridElement;
+            grid.innerHTML = '';
 
-                const firstDay = new Date(year, month, 1).getDay();
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
+            // Fetch attendance data
+            fetch(`/calendar_data?year=${year}&month=${month+1}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) return;
+                    const attendance = data.data;
 
-                const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                dayNames.forEach(name => {
-                    const header = document.createElement('div');
-                    header.textContent = name;
-                    header.style.fontWeight = 'bold';
-                    header.style.textAlign = 'center';
-                    header.style.padding = '5px';
-                    grid.appendChild(header);
-                });
+                    const firstDay = new Date(year, month, 1).getDay();
+                    const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-                for (let i = 0; i < firstDay; i++) {
-                    const empty = document.createElement('div');
-                    empty.style.padding = '10px';
-                    grid.appendChild(empty);
-                }
+                    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    dayNames.forEach(name => {
+                        const header = document.createElement('div');
+                        header.textContent = name;
+                        header.style.fontWeight = 'bold';
+                        header.style.textAlign = 'center';
+                        header.style.padding = '5px';
+                        grid.appendChild(header);
+                    });
 
-                for (let day = 1; day <= daysInMonth; day++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'calendar-day';
-                    cell.textContent = day;
-
-                    const dateObj = new Date(year, month, day);
-                    if (dateObj.getDay() === 0) {
-                        cell.classList.add('Sunday');
-                    } else if (attendance[String(day)]) {
-                        const status = attendance[String(day)];
-                        if (status === 'Present' || status === 'Late') {
-                            cell.classList.add('Present');
-                        } else if (status === 'Absent') {
-                            cell.classList.add('Absent');
-                        }
-                    } else {
-                        cell.classList.add('other-month');
+                    for (let i = 0; i < firstDay; i++) {
+                        const empty = document.createElement('div');
+                        empty.style.padding = '10px';
+                        grid.appendChild(empty);
                     }
-                    grid.appendChild(cell);
-                }
-            })
-            .catch(err => console.error('Calendar error:', err));
+
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'calendar-day';
+                        cell.textContent = day;
+
+                        const dateObj = new Date(year, month, day);
+                        if (dateObj.getDay() === 0) {
+                            cell.classList.add('Sunday');
+                        } else if (attendance[String(day)]) {
+                            const status = attendance[String(day)];
+                            if (status === 'Present' || status === 'Late') {
+                                cell.classList.add('Present');
+                            } else if (status === 'Absent') {
+                                cell.classList.add('Absent');
+                            }
+                        } else {
+                            cell.classList.add('other-month');
+                        }
+                        grid.appendChild(cell);
+                    }
+                })
+                .catch(err => console.error('Calendar error:', err));
+        }
+
+        // Load calendar on page load
+        loadCalendar();
+
+        // Setup calendar navigation
+        document.getElementById('prevMonth')?.addEventListener('click', function() {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            loadCalendar(currentYear, currentMonth);
+        });
+
+        document.getElementById('nextMonth')?.addEventListener('click', function() {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            loadCalendar(currentYear, currentMonth);
+        });
     }
-
-    // Load calendar on page load
-    loadCalendar();
-
-    // Setup calendar navigation
-    document.getElementById('prevMonth')?.addEventListener('click', function() {
-        currentMonth--;
-        if (currentMonth < 0) {
-            currentMonth = 11;
-            currentYear--;
-        }
-        loadCalendar(currentYear, currentMonth);
-    });
-
-    document.getElementById('nextMonth')?.addEventListener('click', function() {
-        currentMonth++;
-        if (currentMonth > 11) {
-            currentMonth = 0;
-            currentYear++;
-        }
-        loadCalendar(currentYear, currentMonth);
-    });
 
     // --- Interval Records Loading ---
     function loadTodayIntervalRecords() {
@@ -134,8 +139,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('📊 Interval data received:', data);
                 
                 if (!data.success) {
-                    document.getElementById('intervalRecords').innerHTML = 
-                        `<p style="color: #666; text-align: center; padding: 20px;">No records marked yet today</p>`;
+                    const intervalRecords = document.getElementById('intervalRecords');
+                    if (intervalRecords) {
+                        intervalRecords.innerHTML = 
+                            `<p style="color: #666; text-align: center; padding: 20px;">No records marked yet today</p>`;
+                    }
                     return;
                 }
 
@@ -170,24 +178,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 html += '</div>';
-                document.getElementById('intervalRecords').innerHTML = html;
-                console.log('✨ Interval records loaded successfully');
+                const intervalRecords = document.getElementById('intervalRecords');
+                if (intervalRecords) {
+                    intervalRecords.innerHTML = html;
+                    console.log('✨ Interval records loaded successfully');
+                }
             })
             .catch(err => {
                 console.error('❌ Interval loading error:', err);
-                document.getElementById('intervalRecords').innerHTML = 
-                    `<p style="color: red; text-align: center; padding: 20px;">Error: ${err.message}</p>`;
+                const intervalRecords = document.getElementById('intervalRecords');
+                if (intervalRecords) {
+                    intervalRecords.innerHTML = 
+                        `<p style="color: red; text-align: center; padding: 20px;">Error: ${err.message}</p>`;
+                }
             });
     }
 
-    // Load interval records on page load
-    loadTodayIntervalRecords();
+    // Load interval records on page load if element exists
+    if (document.getElementById('intervalRecords')) {
+        loadTodayIntervalRecords();
 
-    // Retry after 1 second if still loading
-    setTimeout(() => {
-        if (document.getElementById('intervalRecords')?.textContent?.includes('Loading')) {
-            console.log('⏱️ Retrying interval load...');
-            loadTodayIntervalRecords();
-        }
-    }, 1000);
+        // Retry after 1 second if still loading
+        setTimeout(() => {
+            if (document.getElementById('intervalRecords')?.textContent?.includes('Loading')) {
+                console.log('⏱️ Retrying interval load...');
+                loadTodayIntervalRecords();
+            }
+        }, 1000);
+    }
 });
