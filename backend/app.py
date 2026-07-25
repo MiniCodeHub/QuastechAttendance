@@ -45,11 +45,29 @@ DB_CONFIG = {
 
 ADMIN_CODE = 'admin1246'
 
-COLLEGE_LAT = 19.18711
-COLLEGE_LON = 72.97272
+COLLEGE_LAT = 19.18748
+COLLEGE_LON = 72.97282
 GPS_RADIUS_METERS = 200
 
 IST = pytz.timezone('Asia/Kolkata')
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371000  # Earth radius in metres
+
+    lat1 = math.radians(lat1)
+    lon1 = math.radians(lon1)
+    lat2 = math.radians(lat2)
+    lon2 = math.radians(lon2)
+
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    return R * c
 
 def get_db_connection():
     try:
