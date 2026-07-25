@@ -9,7 +9,7 @@ from pymysql.cursors import DictCursor
 import pytz
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, Reference
-from openpyxl.styles import Alignment
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.datavalidation import DataValidation
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
@@ -28,7 +28,7 @@ app = Flask(
 )
 app.secret_key = os.urandom(24)
 
-# --- Old configuration kept ---
+# --- Database Configuration ---
 DB_CONFIG = {
     "host": "gateway01.ap-southeast-1.prod.aws.tidbcloud.com",
     "port": 4000,
@@ -50,34 +50,35 @@ COLLEGE_LON = 72.97282
 GPS_RADIUS_METERS = 200
 
 IST = pytz.timezone('Asia/Kolkata')
-def haversine(lat1, lon1, lat2, lon2):
-    R = 6371000  # Earth radius in metres
 
+# --- Helper Functions ---
+
+def haversine(lat1, lon1, lat2, lon2):
+    """Calculate distance between two GPS coordinates in meters"""
+    R = 6371000  # Earth radius in metres
     lat1 = math.radians(lat1)
     lon1 = math.radians(lon1)
     lat2 = math.radians(lat2)
     lon2 = math.radians(lon2)
-
     dlat = lat2 - lat1
     dlon = lon2 - lon1
-
     a = (
         math.sin(dlat / 2) ** 2
         + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
     )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
     return R * c
 
 def get_db_connection():
+    """Get database connection"""
     try:
         return pymysql.connect(**DB_CONFIG)
     except Exception as e:
         print(f"❌ Database connection error: {e}")
         return None
 
-# --- Auto-Absent (10:01 PM IST) ---
 def mark_absent_students():
+    """Mark absent students automatically at 10 PM"""
     today = datetime.now(IST).date()
     conn = get_db_connection()
     if not conn:
@@ -102,19 +103,6 @@ def mark_absent_students():
     finally:
         conn.close()
 
-# --- Helper: Convert timedelta to string ---
-def timedelta_to_str(td):
-    if td is None:
-        return ''
-    if isinstance(td, timedelta):
-        total_seconds = int(td.total_seconds())
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-    return str(td)
-
-# --- Helper: Get interval status ---
 def get_interval_status(current_time):
     """Determine which interval the current time falls into (1-4 for 8-12)"""
     hour = current_time.hour
@@ -128,11 +116,11 @@ def get_interval_status(current_time):
         return 4
     return None
 
-# --- Helper: Get month calendar data ---
 def get_month_calendar(reg_number, year, month):
+    """Get attendance data for a specific month"""
     conn = get_db_connection()
     if not conn:
-        return []
+        return {}
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -145,8 +133,8 @@ def get_month_calendar(reg_number, year, month):
     finally:
         conn.close()
 
-# --- Helper: Get dashboard stats ---
 def get_dashboard_stats(reg_number):
+    """Get dashboard statistics for a student"""
     conn = get_db_connection()
     if not conn:
         return {'present': 0, 'absent': 0, 'working_days': 0}
@@ -154,11 +142,6 @@ def get_dashboard_stats(reg_number):
         with conn.cursor() as cur:
             today = datetime.now(IST).date()
             first_day = today.replace(day=1)
-            cur.execute("""
-                SELECT COUNT(*) as total_working_days FROM attendance 
-                WHERE registration_number = %s AND date BETWEEN %s AND %s
-            """, (reg_number, first_day, today))
-            total_days = cur.fetchone()
             
             cur.execute("""
                 SELECT COUNT(CASE WHEN status IN ('Present', 'Late') THEN 1 END) as present,
@@ -168,7 +151,6 @@ def get_dashboard_stats(reg_number):
             """, (reg_number, first_day, today))
             stats = cur.fetchone()
             
-            # Working days excluding Sundays
             working_days = 0
             for d in range((today - first_day).days + 1):
                 current_date = first_day + timedelta(days=d)
@@ -183,16 +165,18 @@ def get_dashboard_stats(reg_number):
     finally:
         conn.close()
 
-# --- Routes ---
+# --- PUBLIC ROUTES ---
 
 @app.route('/')
 def index():
+    """Home page"""
     if session.get('student_logged_in'):
         return redirect(url_for('dashboard'))
     return render_template('index.html')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+    """Student signup route"""
     if request.method == 'POST':
         # Handle both form data and JSON
         if request.is_json:
@@ -213,54 +197,61 @@ def signup():
             password = request.form.get('password', '').strip()
             confirm_password = request.form.get('confirm_password', '').strip()
 
-        # Validate all fields
+        # Convert year to display format
+        year_map = {'1': '1st Year', '2': '2nd Year', '3': '3rd Year'}
+        year_display = year_map.get(year, year)
+
+        # Validation
         if not all([name, registration_number, mobile, year, password, confirm_password]):
+            error_msg = 'All fields are required'
             if request.is_json:
-                return jsonify({'success': False, 'message': 'All fields are required'})
-            return render_template('signup.html', error='All fields are required')
+                return jsonify({'success': False, 'message': error_msg})
+            return render_template('signup.html', error=error_msg)
 
-        # Validate password match
         if password != confirm_password:
+            error_msg = 'Passwords do not match'
             if request.is_json:
-                return jsonify({'success': False, 'message': 'Passwords do not match'})
-            return render_template('signup.html', error='Passwords do not match')
+                return jsonify({'success': False, 'message': error_msg})
+            return render_template('signup.html', error=error_msg)
 
-        # Validate password length
         if len(password) < 6:
+            error_msg = 'Password must be at least 6 characters'
             if request.is_json:
-                return jsonify({'success': False, 'message': 'Password must be at least 6 characters'})
-            return render_template('signup.html', error='Password must be at least 6 characters')
+                return jsonify({'success': False, 'message': error_msg})
+            return render_template('signup.html', error=error_msg)
 
-        # Validate mobile length
         if len(mobile) != 10 or not mobile.isdigit():
+            error_msg = 'Mobile number must be 10 digits'
             if request.is_json:
-                return jsonify({'success': False, 'message': 'Mobile number must be 10 digits'})
-            return render_template('signup.html', error='Mobile number must be 10 digits')
+                return jsonify({'success': False, 'message': error_msg})
+            return render_template('signup.html', error=error_msg)
 
         conn = get_db_connection()
         if not conn:
+            error_msg = 'Database connection failed'
             if request.is_json:
-                return jsonify({'success': False, 'message': 'Database connection failed'})
-            return render_template('signup.html', error='Database connection failed')
+                return jsonify({'success': False, 'message': error_msg})
+            return render_template('signup.html', error=error_msg)
 
         try:
             with conn.cursor() as cur:
-                # Check if registration number already exists
+                # Check if registration number exists
                 cur.execute(
                     'SELECT * FROM registrations WHERE registration_number = %s',
                     (registration_number,)
                 )
                 if cur.fetchone():
+                    error_msg = 'Registration number already exists'
                     if request.is_json:
-                        return jsonify({'success': False, 'message': 'Registration number already exists'})
-                    return render_template('signup.html', error='Registration number already exists')
+                        return jsonify({'success': False, 'message': error_msg})
+                    return render_template('signup.html', error=error_msg)
 
-                # Insert new registration
+                # Insert new student
                 cur.execute("""
                     INSERT INTO registrations 
                     (name, registration_number, mobile, year, course, password, registered_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (name, registration_number, mobile, year, course, password, datetime.now(IST)))
+                """, (name, registration_number, mobile, year_display, course, password, datetime.now(IST)))
 
                 conn.commit()
                 
@@ -268,15 +259,16 @@ def signup():
                     return jsonify({
                         'success': True, 
                         'message': 'Account created successfully!',
-                        'redirect': url_for('login_page')
+                        'redirect': url_for('login')
                     })
-                return redirect(url_for('login_page'))
+                return redirect(url_for('login'))
                 
         except Exception as e:
             print(f"Signup error: {e}")
+            error_msg = 'An error occurred. Please try again.'
             if request.is_json:
-                return jsonify({'success': False, 'message': 'An error occurred. Please try again.'})
-            return render_template('signup.html', error='An error occurred. Please try again.')
+                return jsonify({'success': False, 'message': error_msg})
+            return render_template('signup.html', error=error_msg)
         finally:
             conn.close()
 
@@ -284,42 +276,96 @@ def signup():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    """Student login route"""
     if request.method == 'POST':
-        data = request.get_json()
-        reg_num = data.get('registration_number', '').strip()
-        password = data.get('password', '').strip()
+        # Handle both form data and JSON
+        if request.is_json:
+            data = request.get_json()
+            registration_number = data.get('registration_number', '').strip()
+            password = data.get('password', '').strip()
+        else:
+            registration_number = request.form.get('registration_number', '').strip()
+            password = request.form.get('password', '').strip()
 
-        if reg_num.lower() == ADMIN_CODE:
+        # Validation
+        if not registration_number or not password:
+            error_msg = 'Registration number and password are required'
+            if request.is_json or request.headers.get('Accept') == 'application/json':
+                return jsonify({'success': False, 'message': error_msg})
+            return render_template('login.html', error=error_msg)
+
+        # Check if admin
+        if registration_number == 'admin' and password == '1246':
             session['admin_logged_in'] = True
-            return jsonify({'success': True, 'redirect': '/admin', 'message': 'Admin access granted!'}), 200
+            if request.is_json or request.headers.get('Accept') == 'application/json':
+                return jsonify({
+                    'success': True,
+                    'message': 'Admin login successful!',
+                    'redirect': '/admin',  # ✅ CHANGED: Direct URL instead of url_for()
+                    'is_admin': True
+                })
+            return redirect('/admin')  # ✅ CHANGED: Direct URL instead of url_for()
 
-        if not reg_num or not password:
-            return jsonify({'success': False, 'message': 'Registration Number and Password are required.'}), 400
-
+        # Continue with student login...
         conn = get_db_connection()
         if not conn:
-            return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
+            error_msg = 'Database connection failed'
+            if request.is_json or request.headers.get('Accept') == 'application/json':
+                return jsonify({'success': False, 'message': error_msg})
+            return render_template('login.html', error=error_msg)
+
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT registration_number, name, password FROM registrations WHERE registration_number = %s", (reg_num,))
-                student = cur.fetchone()
-                if not student:
-                    return jsonify({'success': False, 'message': 'Registration ID invalid.'}), 400
-                if student['password'] != password:
-                    return jsonify({'success': False, 'message': 'Password invalid.'}), 400
+                # Check if user exists
+                cur.execute(
+                    'SELECT * FROM registrations WHERE registration_number = %s',
+                    (registration_number,)
+                )
+                user = cur.fetchone()
 
+                if not user:
+                    error_msg = 'Invalid registration number or password'
+                    if request.is_json or request.headers.get('Accept') == 'application/json':
+                        return jsonify({'success': False, 'message': error_msg})
+                    return render_template('login.html', error=error_msg)
+
+                # Check password
+                if user['password'] != password:
+                    error_msg = 'Invalid registration number or password'
+                    if request.is_json or request.headers.get('Accept') == 'application/json':
+                        return jsonify({'success': False, 'message': error_msg})
+                    return render_template('login.html', error=error_msg)
+
+                # Set session variables
+                session['user_id'] = user['id']
+                session['registration_number'] = user['registration_number']
+                session['student_name'] = user['name']
                 session['student_logged_in'] = True
-                session['registration_number'] = student['registration_number']
-                session['student_name'] = student['name']
+
+                # Return JSON response or redirect
+                if request.is_json or request.headers.get('Accept') == 'application/json':
+                    return jsonify({
+                        'success': True,
+                        'message': 'Login successful!',
+                        'redirect': url_for('dashboard')
+                    })
                 
-                return jsonify({'success': True, 'redirect': '/dashboard', 'message': 'Login successful!'})
+                return redirect(url_for('dashboard'))
+
+        except Exception as e:
+            print(f"Login error: {e}")
+            error_msg = 'An error occurred. Please try again.'
+            if request.is_json or request.headers.get('Accept') == 'application/json':
+                return jsonify({'success': False, 'message': error_msg})
+            return render_template('login.html', error=error_msg)
         finally:
             conn.close()
-    
+
     return render_template('login.html')
 
 @app.route('/dashboard')
 def dashboard():
+    """Student dashboard"""
     if not session.get('student_logged_in'):
         return redirect(url_for('login'))
     
@@ -339,11 +385,13 @@ def dashboard():
 
 @app.route('/logout')
 def logout():
+    """Logout route"""
     session.clear()
     return redirect(url_for('index'))
 
 @app.route('/profile')
 def profile():
+    """Student profile page"""
     if not session.get('student_logged_in'):
         return redirect(url_for('login'))
     
@@ -365,6 +413,7 @@ def profile():
 
 @app.route('/calendar_data')
 def calendar_data():
+    """Get calendar data for attendance"""
     if not session.get('student_logged_in'):
         return jsonify({'success': False, 'message': 'Not logged in.'}), 401
     
@@ -374,215 +423,18 @@ def calendar_data():
     reg_number = session['registration_number']
     attendance_map = get_month_calendar(reg_number, year, month)
     
-    calendar_data = {}
-    for day, status in attendance_map.items():
-        calendar_data[str(day)] = status
-    
-    return jsonify({'success': True, 'data': calendar_data})
+    return jsonify({'success': True, 'data': attendance_map})
 
 @app.route('/attendance_page')
 def attendance_page():
+    """Attendance marking page"""
     if not session.get('student_logged_in'):
         return redirect(url_for('login'))
     return render_template('attendance_form.html')
 
-# --- Admin Routes ---
-
-@app.route('/admin', methods=['GET', 'POST'])
-def admin_panel():
-    if request.method == 'POST':
-        password = request.form.get('password')
-        if password == '1246':
-            session['admin_logged_in'] = True
-            return redirect(url_for('admin_panel'))
-        else:
-            return render_template('admin.html', error="Wrong password")
-    if not session.get('admin_logged_in'):
-        return render_template('admin.html', error=None)
-    
-    conn = get_db_connection()
-    registrations = []
-    total_registrations = 0
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT * FROM registrations ORDER BY registered_at DESC")
-                registrations = cur.fetchall()
-                total_registrations = len(registrations)
-        finally:
-            conn.close()
-    
-    return render_template('admin.html', registrations=registrations, total_registrations=total_registrations)
-
-@app.route('/admin/search')
-def admin_search():
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'message': 'Not authorized.'}), 401
-    
-    query = request.args.get('q', '').strip()
-    if not query:
-        return jsonify({'success': True, 'data': []})
-    
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT * FROM registrations 
-                WHERE name LIKE %s OR registration_number LIKE %s
-                ORDER BY registered_at DESC
-            """, (f'%{query}%', f'%{query}%'))
-            results = cur.fetchall()
-            return jsonify({'success': True, 'data': results})
-    finally:
-        conn.close()
-
-@app.route('/admin/logout')
-def admin_logout():
-    session.pop('admin_logged_in', None)
-    return redirect(url_for('index'))
-
-@app.route('/admin/reset_password', methods=['POST'])
-def admin_reset_password():
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
-    
-    data = request.json
-    reg_number = data.get('registration_number')
-    new_password = data.get('new_password', '123456').strip()
-    
-    if not new_password or len(new_password) < 6:
-        return jsonify({'success': False, 'message': 'Password must be at least 6 characters'})
-    
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE registrations SET password = %s WHERE registration_number = %s", 
-                       (new_password, reg_number))
-        return jsonify({'success': True, 'new_password': new_password})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-    finally:
-        conn.close()
-
-@app.route('/admin/delete_student', methods=['POST'])
-def admin_delete_student():
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'message': 'Unauthorized'})
-    
-    data = request.json
-    reg_number = data.get('registration_number')
-    
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM registrations WHERE registration_number = %s", (reg_number,))
-            cur.execute("DELETE FROM attendance WHERE registration_number = %s", (reg_number,))
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-    finally:
-        conn.close()
-
-# --- Attendance API ---
-
-@app.route('/mark_attendance', methods=['POST'])
-def mark_attendance():
-    data = request.get_json()
-    registration_number = data.get('registration_number', '').strip()
-    year = data.get('year', '').strip()
-    latitude = data.get('latitude')
-    longitude = data.get('longitude')
-    device_fingerprint = data.get('device_fingerprint', '').strip()
-
-    if registration_number.lower() == ADMIN_CODE:
-        session['admin_logged_in'] = True
-        return jsonify({'success': True, 'redirect': '/admin', 'message': 'Admin access granted!'}), 200
-
-    if not session.get('student_logged_in'):
-        return jsonify({'success': False, 'message': 'Please login first.'}), 401
-
-    if registration_number != session['registration_number']:
-        return jsonify({'success': False, 'message': 'You can only mark your own attendance.'}), 400
-
-    if not all([registration_number, year]):
-        return jsonify({'success': False, 'message': 'Registration Number and Year are required.'}), 400
-    if year not in ['FYBCA', 'SYBCA', 'TYBCA']:
-        return jsonify({'success': False, 'message': 'Invalid year.'}), 400
-    if latitude is None or longitude is None:
-        return jsonify({'success': False, 'message': 'Location access is required.'}), 400
-    if not device_fingerprint:
-        return jsonify({'success': False, 'message': 'Device fingerprint not available.'}), 400
-
-    distance = haversine(COLLEGE_LAT, COLLEGE_LON, float(latitude), float(longitude))
-    if distance > GPS_RADIUS_METERS:
-        return jsonify({'success': False, 'message': f'You are not within college campus. Distance: {int(distance)} meters.'}), 400
-
-    now = datetime.now(IST)
-    current_time = now.time()
-    current_date = now.date()
-
-    # Check if within attendance window
-    if current_time < time(8, 0):
-        return jsonify({'success': False, 'message': 'Attendance window starts at 8:00 AM IST.'}), 400
-    if current_time >= time(12, 0):
-        return jsonify({'success': False, 'message': 'Attendance window closed at 12:00 PM IST.'}), 400
-
-    # Get current interval
-    interval = get_interval_status(current_time)
-    if interval is None:
-        return jsonify({'success': False, 'message': 'Invalid attendance interval.'}), 400
-
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT year FROM registrations WHERE registration_number = %s", (registration_number,))
-            student = cur.fetchone()
-            if not student:
-                return jsonify({'success': False, 'message': 'Invalid Registration Number.'}), 400
-            if student['year'] != year:
-                return jsonify({'success': False, 'message': f"Student is in {student['year']}, not {year}."}), 400
-
-            # Check if attendance already marked for this interval
-            cur.execute("""
-                SELECT id FROM attendance 
-                WHERE registration_number = %s AND date = %s AND interval_number = %s
-            """, (registration_number, current_date, interval))
-            if cur.fetchone():
-                return jsonify({'success': False, 'message': f'Attendance already marked for interval {interval} (hour {interval + 7}).'}), 400
-
-            # Prevent device reuse for same interval
-            cur.execute("""
-                SELECT registration_number FROM attendance 
-                WHERE device_fingerprint = %s AND date = %s AND interval_number = %s
-            """, (device_fingerprint, current_date, interval))
-            existing = cur.fetchone()
-            if existing and existing['registration_number'] != registration_number:
-                return jsonify({'success': False, 'message': f'This device has already been used for interval {interval} today.'}), 400
-
-            # Record attendance for current interval
-            cur.execute("""
-                INSERT INTO attendance 
-                (registration_number, date, time_in, status, device_fingerprint, interval_number) 
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (registration_number, current_date, current_time, 'Present', device_fingerprint, interval))
-            conn.commit()
-            
-            return jsonify({
-                'success': True, 
-                'message': f'Attendance marked for interval {interval} (hour {interval + 7}:00 - {interval + 8}:00).', 
-                'interval': interval,
-                'status': 'Present'
-            })
-    finally:
-        conn.close()
-
-# Add new route to get student's attendance status for today
 @app.route('/get_daily_attendance_status')
 def get_daily_attendance_status():
+    """Get today's attendance status"""
     if not session.get('student_logged_in'):
         return jsonify({'success': False, 'message': 'Not logged in.'}), 401
     
@@ -607,7 +459,6 @@ def get_daily_attendance_status():
                 interval = record['interval_number']
                 time_in = record['time_in']
                 
-                # Convert timedelta to string format
                 if isinstance(time_in, timedelta):
                     total_seconds = int(time_in.total_seconds())
                     hours = total_seconds // 3600
@@ -632,9 +483,335 @@ def get_daily_attendance_status():
     finally:
         conn.close()
 
-# Add the admin route for viewing student interval records
+@app.route('/get_session_data')
+def get_session_data():
+    """Get session data"""
+    if session.get('student_logged_in'):
+        return jsonify({
+            'registration_number': session.get('registration_number'),
+            'student_name': session.get('student_name')
+        })
+    return jsonify({'success': False})
+
+# --- ATTENDANCE API ---
+
+@app.route('/mark_attendance', methods=['POST'])
+def mark_attendance():
+    """Mark student attendance"""
+    data = request.get_json()
+    registration_number = data.get('registration_number', '').strip()
+    year = data.get('year', '').strip()
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    device_fingerprint = data.get('device_fingerprint', '').strip()
+
+    # Check for admin code
+    if registration_number.lower() == ADMIN_CODE.lower():
+        session['admin_logged_in'] = True
+        return jsonify({
+            'success': True, 
+            'message': 'Admin access granted!',
+            'redirect': '/admin',  # ✅ CHANGED: Direct URL instead of url_for()
+            'is_admin': True
+        }), 200
+
+    if not session.get('student_logged_in'):
+        return jsonify({'success': False, 'message': 'Please login first.'}), 401
+
+    if registration_number != session['registration_number']:
+        return jsonify({'success': False, 'message': 'You can only mark your own attendance.'}), 400
+
+    if not all([registration_number, year]):
+        return jsonify({'success': False, 'message': 'Registration Number and Year are required.'}), 400
+    if year not in ['FYBCA', 'SYBCA', 'TYBCA']:
+        return jsonify({'success': False, 'message': 'Invalid year.'}), 400
+    if latitude is None or longitude is None:
+        return jsonify({'success': False, 'message': 'Location access is required.'}), 400
+    if not device_fingerprint:
+        return jsonify({'success': False, 'message': 'Device fingerprint not available.'}), 400
+
+    # Check GPS distance
+    distance = haversine(COLLEGE_LAT, COLLEGE_LON, float(latitude), float(longitude))
+    if distance > GPS_RADIUS_METERS:
+        return jsonify({'success': False, 'message': f'You are not within college campus. Distance: {int(distance)} meters.'}), 400
+
+    now = datetime.now(IST)
+    current_time = now.time()
+    current_date = now.date()
+
+    # Check time window
+    if current_time < time(8, 0):
+        return jsonify({'success': False, 'message': 'Attendance window starts at 8:00 AM IST.'}), 400
+    if current_time >= time(12, 0):
+        return jsonify({'success': False, 'message': 'Attendance window closed at 12:00 PM IST.'}), 400
+
+    interval = get_interval_status(current_time)
+    if interval is None:
+        return jsonify({'success': False, 'message': 'Invalid attendance interval.'}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
+    try:
+        with conn.cursor() as cur:
+            # Verify student
+            cur.execute("SELECT year FROM registrations WHERE registration_number = %s", (registration_number,))
+            student = cur.fetchone()
+            if not student:
+                return jsonify({'success': False, 'message': 'Invalid Registration Number.'}), 400
+            if student['year'] != year:
+                return jsonify({'success': False, 'message': f"Student is in {student['year']}, not {year}."}), 400
+
+            # Check if already marked
+            cur.execute("""
+                SELECT id FROM attendance 
+                WHERE registration_number = %s AND date = %s AND interval_number = %s
+            """, (registration_number, current_date, interval))
+            if cur.fetchone():
+                return jsonify({'success': False, 'message': f'Attendance already marked for interval {interval} (hour {interval + 7}).'}), 400
+
+            # Check device duplicate
+            cur.execute("""
+                SELECT registration_number FROM attendance 
+                WHERE device_fingerprint = %s AND date = %s AND interval_number = %s
+            """, (device_fingerprint, current_date, interval))
+            existing = cur.fetchone()
+            if existing and existing['registration_number'] != registration_number:
+                return jsonify({'success': False, 'message': f'This device has already been used for interval {interval} today.'}), 400
+
+            # Insert attendance
+            cur.execute("""
+                INSERT INTO attendance 
+                (registration_number, date, time_in, status, device_fingerprint, interval_number) 
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (registration_number, current_date, current_time, 'Present', device_fingerprint, interval))
+            conn.commit()
+            
+            return jsonify({
+                'success': True, 
+                'message': f'Attendance marked for interval {interval} (hour {interval + 7}:00 - {interval + 8}:00).', 
+                'interval': interval,
+                'status': 'Present'
+            })
+    finally:
+        conn.close()
+
+# --- ADMIN ROUTES ---
+
+@app.route('/admin_panel', methods=['GET', 'POST'])
+@app.route('/admin', methods=['GET', 'POST'])  # ✅ Both routes handled by same function
+def admin_panel():
+    """Admin panel"""
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == '1246':
+            session['admin_logged_in'] = True
+            return redirect(url_for('admin_panel'))
+        else:
+            return render_template('admin.html', error="Wrong password")
+    
+    if not session.get('admin_logged_in'):
+        return render_template('admin.html', error=None)
+    
+    conn = get_db_connection()
+    registrations = []
+    total_registrations = 0
+    
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM registrations ORDER BY registered_at DESC")
+                registrations = cur.fetchall()
+                total_registrations = len(registrations)
+        finally:
+            conn.close()
+    
+    return render_template('admin.html', registrations=registrations, total_registrations=total_registrations)
+
+@app.route('/admin/search')
+def admin_search():
+    """Search students"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': 'Not authorized.'}), 401
+    
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify({'success': True, 'data': []})
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM registrations 
+                WHERE name LIKE %s OR registration_number LIKE %s
+                ORDER BY registered_at DESC
+            """, (f'%{query}%', f'%{query}%'))
+            results = cur.fetchall()
+            return jsonify({'success': True, 'data': results})
+    finally:
+        conn.close()
+
+@app.route('/admin/logout')
+def admin_logout():
+    """Admin logout"""
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('index'))
+
+@app.route('/admin/reset_password', methods=['POST'])
+def admin_reset_password():
+    """Reset student password"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    data = request.json
+    reg_number = data.get('registration_number')
+    new_password = data.get('new_password', '123456').strip()
+    
+    if not new_password or len(new_password) < 6:
+        return jsonify({'success': False, 'message': 'Password must be at least 6 characters'})
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE registrations SET password = %s WHERE registration_number = %s", 
+                       (new_password, reg_number))
+            conn.commit()
+        return jsonify({'success': True, 'new_password': new_password})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        conn.close()
+
+@app.route('/admin/delete_student', methods=['POST'])
+def admin_delete_student():
+    """Delete student and attendance"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    data = request.json
+    reg_number = data.get('registration_number')
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM attendance WHERE registration_number = %s", (reg_number,))
+            cur.execute("DELETE FROM registrations WHERE registration_number = %s", (reg_number,))
+            conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        conn.close()
+
+@app.route('/admin/reset_attendance', methods=['POST'])
+def admin_reset_attendance():
+    """Reset attendance records only"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    data = request.json
+    reg_number = data.get('registration_number', '').strip()
+    
+    if not reg_number:
+        return jsonify({'success': False, 'message': 'Registration number is required'}), 400
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT name FROM registrations WHERE registration_number = %s", (reg_number,))
+            student = cur.fetchone()
+            
+            if not student:
+                return jsonify({'success': False, 'message': 'Student not found'}), 400
+            
+            cur.execute("SELECT COUNT(*) as count FROM attendance WHERE registration_number = %s", (reg_number,))
+            count_result = cur.fetchone()
+            records_deleted = count_result.get('count', 0) if count_result else 0
+            
+            cur.execute("DELETE FROM attendance WHERE registration_number = %s", (reg_number,))
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Attendance records reset successfully',
+                'student_name': student['name'],
+                'records_deleted': records_deleted
+            })
+            
+    except Exception as e:
+        print(f"Error resetting attendance: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/admin/reset_all_data', methods=['POST'])
+def admin_reset_all_data():
+    """Reset all data for student"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    data = request.json
+    reg_number = data.get('registration_number', '').strip()
+    confirm = data.get('confirm', False)
+    
+    if not reg_number:
+        return jsonify({'success': False, 'message': 'Registration number is required'}), 400
+    
+    if not confirm:
+        return jsonify({
+            'success': False,
+            'message': 'Confirmation required',
+            'requires_confirmation': True
+        }), 400
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT name FROM registrations WHERE registration_number = %s", (reg_number,))
+            student = cur.fetchone()
+            
+            if not student:
+                return jsonify({'success': False, 'message': 'Student not found'}), 400
+            
+            cur.execute("SELECT COUNT(*) as count FROM attendance WHERE registration_number = %s", (reg_number,))
+            attendance_count = cur.fetchone().get('count', 0)
+            
+            cur.execute("DELETE FROM attendance WHERE registration_number = %s", (reg_number,))
+            cur.execute("DELETE FROM registrations WHERE registration_number = %s", (reg_number,))
+            
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Student and all records deleted permanently',
+                'deleted_student': student['name'],
+                'deleted_attendance_records': attendance_count
+            })
+            
+    except Exception as e:
+        print(f"Error resetting all data: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        conn.close()
+
 @app.route('/admin/student_interval_records')
 def admin_student_interval_records():
+    """Get student interval records"""
     if not session.get('admin_logged_in'):
         return jsonify({'success': False, 'message': 'Not authorized'}), 401
     
@@ -644,6 +821,7 @@ def admin_student_interval_records():
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+    
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -659,7 +837,6 @@ def admin_student_interval_records():
                 interval = record['interval_number']
                 time_in = record['time_in']
                 
-                # Convert timedelta to string format
                 if isinstance(time_in, timedelta):
                     total_seconds = int(time_in.total_seconds())
                     hours = total_seconds // 3600
@@ -683,7 +860,110 @@ def admin_student_interval_records():
     finally:
         conn.close()
 
-# --- Scheduler ---
+@app.route('/download_full_report')
+def download_full_report():
+    """Download attendance report as Excel"""
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT registration_number, name, mobile, year, course, registered_at 
+                FROM registrations 
+                ORDER BY registered_at DESC
+            """)
+            registrations = cur.fetchall()
+            
+            cur.execute("""
+                SELECT 
+                    registration_number,
+                    COUNT(*) as total_days,
+                    SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present_days,
+                    SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent_days,
+                    SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late_days
+                FROM attendance
+                GROUP BY registration_number
+            """)
+            attendance_summary = {row['registration_number']: row for row in cur.fetchall()}
+        
+        # Create Excel workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Attendance Report"
+        
+        headers = ['Registration Number', 'Name', 'Mobile', 'Year', 'Course', 'Registered At', 
+                   'Total Days', 'Present', 'Absent', 'Late', 'Attendance %']
+        ws.append(headers)
+        
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        for reg in registrations:
+            reg_num = reg['registration_number']
+            summary = attendance_summary.get(reg_num, {})
+            
+            total_days = summary.get('total_days', 0) or 0
+            present = summary.get('present_days', 0) or 0
+            absent = summary.get('absent_days', 0) or 0
+            late = summary.get('late_days', 0) or 0
+            
+            attendance_pct = (present / total_days * 100) if total_days > 0 else 0
+            registered_at = reg['registered_at'].strftime('%Y-%m-%d %H:%M:%S') if reg['registered_at'] else ''
+            
+            ws.append([
+                reg_num,
+                reg['name'],
+                reg['mobile'],
+                reg['year'],
+                reg['course'] or 'BCA',
+                registered_at,
+                total_days,
+                present,
+                absent,
+                late,
+                f"{attendance_pct:.2f}%"
+            ])
+        
+        # Set column widths
+        ws.column_dimensions['A'].width = 18
+        ws.column_dimensions['B'].width = 20
+        ws.column_dimensions['C'].width = 12
+        ws.column_dimensions['D'].width = 12
+        ws.column_dimensions['E'].width = 12
+        ws.column_dimensions['F'].width = 20
+        ws.column_dimensions['G'].width = 12
+        ws.column_dimensions['H'].width = 10
+        ws.column_dimensions['I'].width = 10
+        ws.column_dimensions['J'].width = 10
+        ws.column_dimensions['K'].width = 15
+        
+        # Create file
+        file_stream = BytesIO()
+        wb.save(file_stream)
+        file_stream.seek(0)
+        
+        return send_file(
+            file_stream,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'attendance_report_{datetime.now(IST).strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+    
+    except Exception as e:
+        print(f"Error generating report: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        conn.close()
+
+# --- SCHEDULER ---
+
 scheduler = BackgroundScheduler()
 scheduler.add_job(
     mark_absent_students,
@@ -694,14 +974,7 @@ scheduler.add_job(
 )
 scheduler.start()
 
+# --- MAIN ---
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
-
-@app.route('/get_session_data')
-def get_session_data():
-    if session.get('student_logged_in'):
-        return jsonify({
-            'registration_number': session.get('registration_number'),
-            'student_name': session.get('student_name')
-        })
-    return jsonify({'success': False})

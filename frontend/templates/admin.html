@@ -2,105 +2,440 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Panel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Attendance System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
 </head>
-<body id="appBody">
-<div class="container">
-    {% if session.admin_logged_in %}
-        <div class="header">
-            <h1>📊 Admin Panel</h1>
-            <a href="{{ url_for('admin_logout') }}" class="btn logout">Logout</a>
-        </div>
+<body>
+    <div class="container">
+        {% if not session.get('admin_logged_in') %}
+            <div class="login-box">
+                <h2>Admin Login</h2>
+                {% if error %}
+                    <div class="error">{{ error }}</div>
+                {% endif %}
+                <form method="post">
+                    <input type="password" name="password" placeholder="Enter Admin Password" required>
+                    <button type="submit">Login</button>
+                </form>
+            </div>
+        {% else %}
+            <!-- Header -->
+            <div class="header">
+                <h1>📊 Admin Dashboard</h1>
+                <a href="{{ url_for('admin_logout') }}" class="btn logout">Logout</a>
+            </div>
 
-        <a href="{{ url_for('download_full_report') }}" class="btn">📥 Download Report (Excel)</a>
+            <!-- Download Report Button -->
+            <div style="margin: 20px 0;">
+                <a href="{{ url_for('download_full_report') }}" class="btn" style="background: #007bff;">
+                    📥 Download Full Report
+                </a>
+            </div>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>Total Registrations</h3>
-                <p>{{ total_registrations }}</p>
+            <!-- Search Bar -->
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="Search by name or registration number...">
+            </div>
+
+            <!-- Toggle Buttons -->
+            <div class="toggle-buttons">
+                <button class="toggle-btn active" data-view="students">👥 Student List</button>
+                <button class="toggle-btn" data-view="attendance">📅 Year-wise Attendance</button>
+            </div>
+
+            <!-- Students Table View -->
+            <div id="students-view" class="view-section">
+                <div class="table-wrapper">
+                    <table class="responsive-table">
+                        <thead>
+                            <tr>
+                                <th>Registration Number</th>
+                                <th>Name</th>
+                                <th>Mobile</th>
+                                <th>Year</th>
+                                <th>Course</th>
+                                <th>Password</th>
+                                <th>Registered At</th>
+                                <th>Today's Intervals</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            {% if registrations %}
+                                {% for reg in registrations %}
+                                    <tr data-reg-number="{{ reg.registration_number }}">
+                                        <td data-label="Reg No">{{ reg.registration_number }}</td>
+                                        <td data-label="Name">{{ reg.name }}</td>
+                                        <td data-label="Mobile">{{ reg.mobile }}</td>
+                                        <td data-label="Year">{{ reg.year }}</td>
+                                        <td data-label="Course">{{ reg.course or 'BCA' }}</td>
+                                        <td data-label="Password">
+                                            <span class="password-mask">••••••</span>
+                                            <span class="password-value" style="display:none;">{{ reg.password }}</span>
+                                        </td>
+                                        <td data-label="Registered">
+                                            {% if reg.registered_at %}
+                                                {{ reg.registered_at.strftime('%Y-%m-%d %H:%M') }}
+                                            {% endif %}
+                                        </td>
+                                        <td data-label="Intervals">
+                                            <button class="btn btn-view" onclick="viewIntervals('{{ reg.registration_number }}')">View</button>
+                                        </td>
+                                        <td data-label="Actions">
+                                            <div class="action-buttons">
+                                                <button class="btn btn-reset" onclick="resetPassword('{{ reg.registration_number }}', '{{ reg.name }}')">Reset</button>
+                                                <button class="btn btn-delete" onclick="deleteStudent('{{ reg.registration_number }}', '{{ reg.name }}')">Delete</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="9" style="text-align: center; color: #999;">No students registered yet</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Year-wise Attendance View -->
+            <div id="attendance-view" class="view-section" style="display: none;">
+                <div class="attendance-filters">
+                    <select id="yearFilter" onchange="filterAttendance()">
+                        <option value="">Select Year</option>
+                        <option value="1st Year">1st Year</option>
+                        <option value="2nd Year">2nd Year</option>
+                        <option value="3rd Year">3rd Year</option>
+                    </select>
+                    <select id="courseFilter" onchange="filterAttendance()">
+                        <option value="">Select Course</option>
+                        <option value="BCA">BCA</option>
+                    </select>
+                    <select id="sessionFilter" onchange="filterAttendance()">
+                        <option value="">Select Session</option>
+                        <option value="2024-25">2024-25</option>
+                        <option value="2025-26">2025-26</option>
+                        <option value="2026-27">2026-27</option>
+                    </select>
+                </div>
+
+                <div class="attendance-table-wrapper">
+                    <table class="responsive-table attendance-table">
+                        <thead>
+                            <tr>
+                                <th>Registration Number</th>
+                                <th>Student Name</th>
+                                <th>Year</th>
+                                <th>Session</th>
+                                <th>Interval 1<br>(8-9 AM)</th>
+                                <th>Interval 2<br>(9-10 AM)</th>
+                                <th>Interval 3<br>(10-11 AM)</th>
+                                <th>Interval 4<br>(11-12 PM)</th>
+                                <th>Total Present</th>
+                                <th>Total Absent</th>
+                                <th>Attendance %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceBody">
+                            {% if registrations %}
+                                {% for reg in registrations %}
+                                    <tr class="attendance-row" data-year="{{ reg.year }}" data-course="{{ reg.course or 'BCA' }}">
+                                        <td data-label="Reg No">{{ reg.registration_number }}</td>
+                                        <td data-label="Name">{{ reg.name }}</td>
+                                        <td data-label="Year">{{ reg.year }}</td>
+                                        <td data-label="Session">2025-26</td>
+                                        <td data-label="Interval 1" class="interval-cell">-</td>
+                                        <td data-label="Interval 2" class="interval-cell">-</td>
+                                        <td data-label="Interval 3" class="interval-cell">-</td>
+                                        <td data-label="Interval 4" class="interval-cell">-</td>
+                                        <td data-label="Total Present" class="present-count">0</td>
+                                        <td data-label="Total Absent" class="absent-count">0</td>
+                                        <td data-label="Attendance %" class="attendance-percent">0%</td>
+                                    </tr>
+                                {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Total Students Info -->
+            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+                <h3>Total Students: <span style="color: #007bff; font-size: 24px;">{{ total_registrations }}</span></h3>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Modals -->
+    <div id="intervalModal" class="modal">
+        <div class="modal-content">
+            <button class="close" onclick="closeModal('intervalModal')">&times;</button>
+            <h2>📅 Today's Interval Records</h2>
+            <p id="studentNameDisplay"></p>
+            <div id="intervalRecords" class="interval-grid-admin"></div>
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="closeModal('intervalModal')">Close</button>
             </div>
         </div>
+    </div>
 
-        <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="🔍 Search by Name or Registration Number..." onkeyup="searchStudents()">
-        </div>
-
-        <h2>Registrations</h2>
-        <div id="registrationsTable">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Registration Number</th>
-                        <th>Name</th>
-                        <th>Mobile</th>
-                        <th>Year</th>
-                        <th>Course</th>
-                        <th>Password</th>
-                        <th>Registered At</th>
-                        <th>Today's Intervals</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for reg in registrations %}
-                    <tr>
-                        <td>{{ reg.registration_number }}</td>
-                        <td>{{ reg.name }}</td>
-                        <td>{{ reg.mobile }}</td>
-                        <td>{{ reg.year }}</td>
-                        <td>{{ reg.course or 'BCA' }}</td>
-                        <td>{{ reg.password }}</td>
-                        <td>{{ reg.registered_at.strftime('%Y-%m-%d %H:%M:%S') if reg.registered_at else '' }}</td>
-                        <td>
-                            <button class="btn btn-view" onclick="viewIntervalRecords('{{ reg.registration_number }}', '{{ reg.name }}')">📊 View</button>
-                        </td>
-                        <td>
-                            <button class="btn btn-reset" onclick="openResetModal('{{ reg.registration_number }}', '{{ reg.name }}')">🔑 Reset</button>
-                            <button class="btn btn-delete" onclick="deleteRecord('{{ reg.registration_number }}')">🗑️ Delete</button>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="9">No registrations found.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Interval Records Modal -->
-        <div id="intervalModal" class="modal">
-            <div class="modal-content" style="width: min(90%, 600px);">
-                <span class="close" onclick="closeIntervalModal()">&times;</span>
-                <h2>Today's Interval Records</h2>
-                <p id="studentInfo"></p>
-                <div id="intervalRecordsContent" class="interval-grid-admin"></div>
+    <div id="resetPasswordModal" class="modal">
+        <div class="modal-content">
+            <button class="close" onclick="closeModal('resetPasswordModal')">&times;</button>
+            <h2>🔐 Reset Password</h2>
+            <label>New Password:</label>
+            <input type="text" id="newPassword" placeholder="Enter new password (min 6 characters)">
+            <label>Student Name:</label>
+            <input type="text" id="studentName" disabled>
+            <div class="modal-buttons">
+                <button class="btn-confirm" onclick="confirmResetPassword()">Reset</button>
+                <button class="btn-cancel" onclick="closeModal('resetPasswordModal')">Cancel</button>
             </div>
         </div>
+    </div>
 
-        <!-- Reset Password Modal -->
-        <div id="resetModal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeResetModal()">&times;</span>
-                <h2>Reset Password</h2>
-                <p id="studentInfo2"></p>
-                <label>New Password:</label>
-                <input type="password" id="newPassword" placeholder="Enter new password" required>
-                <button class="modal-btn" onclick="confirmResetPassword()">Reset Password</button>
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <button class="close" onclick="closeModal('deleteModal')">&times;</button>
+            <h2>⚠️ Delete Student</h2>
+            <p style="color: #dc3545; font-weight: bold;">This action cannot be undone!</p>
+            <p id="deleteStudentInfo"></p>
+            <div class="reset-options">
+                <div class="reset-option" onclick="selectDeleteOption(this, 'attendance')">
+                    <span class="option-icon">📋</span>
+                    <div class="option-title">Reset Attendance Only</div>
+                    <div class="option-desc">Keep student account, delete attendance records</div>
+                </div>
+                <div class="reset-option" onclick="selectDeleteOption(this, 'all')">
+                    <span class="option-icon">🗑️</span>
+                    <div class="option-title">Delete Everything</div>
+                    <div class="option-desc">Permanently remove student and all records</div>
+                </div>
+            </div>
+            <div class="confirm-message" id="confirmDeleteMessage">
+                ⚠️ Are you sure? This cannot be undone!
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-confirm" id="confirmDeleteBtn" onclick="confirmDelete()" disabled>Delete</button>
+                <button class="btn-cancel" onclick="closeModal('deleteModal')">Cancel</button>
             </div>
         </div>
+    </div>
 
-        <script src="{{ url_for('static', filename='admin.js') }}"></script>
-    {% else %}
-        <div class="login-box">
-            <h2>Admin Login</h2>
-            {% if error %}<div style="color:red;">{{ error }}</div>{% endif %}
-            <form method="POST">
-                <label>Password</label>
-                <input type="password" name="password" placeholder="Enter password" required>
-                <button type="submit">Login</button>
-            </form>
-        </div>
-    {% endif %}
-</div>
+    <script>
+        let currentRegNumber = '';
+        let deleteOption = '';
+        let currentDeleteType = '';
+
+        // Toggle Views
+        document.querySelectorAll('.toggle-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                const view = this.getAttribute('data-view');
+                document.querySelectorAll('.view-section').forEach(section => {
+                    section.style.display = 'none';
+                });
+                document.getElementById(view + '-view').style.display = 'block';
+                
+                if (view === 'attendance') {
+                    loadAttendanceData();
+                }
+            });
+        });
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('keyup', function() {
+            const searchTerm = this.value.toLowerCase();
+            document.querySelectorAll('#tableBody tr').forEach(row => {
+                const regNo = row.getAttribute('data-reg-number').toLowerCase();
+                const name = row.cells[1].textContent.toLowerCase();
+                row.style.display = (regNo.includes(searchTerm) || name.includes(searchTerm)) ? '' : 'none';
+            });
+        });
+
+        // View Intervals
+        async function viewIntervals(regNumber) {
+            try {
+                const response = await fetch(`/admin/student_interval_records?reg_number=${regNumber}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const recordsDiv = document.getElementById('intervalRecords');
+                    recordsDiv.innerHTML = '';
+
+                    if (Object.keys(data.records).length === 0) {
+                        recordsDiv.innerHTML = '<p style="text-align: center; color: #999;">No attendance marked today</p>';
+                    } else {
+                        Object.entries(data.records).forEach(([interval, record]) => {
+                            const statusClass = record.status.toLowerCase();
+                            recordsDiv.innerHTML += `
+                                <div class="interval-card-admin ${statusClass}">
+                                    <div class="interval-time">Interval ${interval}</div>
+                                    <div class="interval-status">${record.status}</div>
+                                    <div class="interval-marked">${record.time_in}</div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    const studentName = document.querySelector(`tr[data-reg-number="${regNumber}"] td:nth-child(2)`).textContent;
+                    document.getElementById('studentNameDisplay').textContent = `📝 ${studentName} (${regNumber})`;
+                    document.getElementById('intervalModal').classList.add('show');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to load interval records');
+            }
+        }
+
+        // Reset Password
+        function resetPassword(regNumber, name) {
+            currentRegNumber = regNumber;
+            document.getElementById('studentName').value = name;
+            document.getElementById('newPassword').value = '123456';
+            document.getElementById('resetPasswordModal').classList.add('show');
+        }
+
+        async function confirmResetPassword() {
+            const newPassword = document.getElementById('newPassword').value.trim();
+
+            if (!newPassword || newPassword.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/reset_password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        registration_number: currentRegNumber,
+                        new_password: newPassword
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`✅ Password reset successfully!\nNew Password: ${data.new_password}`);
+                    closeModal('resetPasswordModal');
+                } else {
+                    alert('❌ ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to reset password');
+            }
+        }
+
+        // Delete Student
+        function deleteStudent(regNumber, name) {
+            currentRegNumber = regNumber;
+            deleteOption = '';
+            currentDeleteType = '';
+            document.getElementById('deleteStudentInfo').innerHTML = `<strong>${name}</strong> (${regNumber})`;
+            document.getElementById('confirmDeleteMessage').style.display = 'none';
+            document.getElementById('confirmDeleteBtn').disabled = true;
+            document.querySelectorAll('.reset-option').forEach(opt => opt.classList.remove('selected'));
+            document.getElementById('deleteModal').classList.add('show');
+        }
+
+        function selectDeleteOption(element, type) {
+            document.querySelectorAll('.reset-option').forEach(opt => opt.classList.remove('selected'));
+            element.classList.add('selected');
+            currentDeleteType = type;
+            document.getElementById('confirmDeleteMessage').style.display = 'block';
+            document.getElementById('confirmDeleteBtn').disabled = false;
+        }
+
+        async function confirmDelete() {
+            if (!currentDeleteType) {
+                alert('Please select an option');
+                return;
+            }
+
+            let endpoint, body;
+
+            if (currentDeleteType === 'attendance') {
+                endpoint = '/admin/reset_attendance';
+                body = { registration_number: currentRegNumber };
+            } else if (currentDeleteType === 'all') {
+                endpoint = '/admin/reset_all_data';
+                body = { registration_number: currentRegNumber, confirm: true };
+            }
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    closeModal('deleteModal');
+                    location.reload();
+                } else {
+                    alert('❌ ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to process delete request');
+            }
+        }
+
+        // Load Attendance Data
+        async function loadAttendanceData() {
+            try {
+                const response = await fetch('/api/get_all_attendance');
+                const data = await response.json();
+
+                if (data.success) {
+                    // Process and display attendance data
+                    updateAttendanceTable(data.attendance);
+                }
+            } catch (error) {
+                console.error('Error loading attendance:', error);
+            }
+        }
+
+        function updateAttendanceTable(attendanceData) {
+            // This would update the attendance table with data from the backend
+            // Implementation depends on your database structure
+        }
+
+        function filterAttendance() {
+            const year = document.getElementById('yearFilter').value;
+            const course = document.getElementById('courseFilter').value;
+            const session = document.getElementById('sessionFilter').value;
+
+            document.querySelectorAll('.attendance-row').forEach(row => {
+                const rowYear = row.getAttribute('data-year');
+                const rowCourse = row.getAttribute('data-course');
+
+                const yearMatch = !year || rowYear === year;
+                const courseMatch = !course || rowCourse === course;
+
+                row.style.display = (yearMatch && courseMatch) ? '' : 'none';
+            });
+        }
+
+        // Modal Functions
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('show');
+            }
+        }
+    </script>
 </body>
 </html>

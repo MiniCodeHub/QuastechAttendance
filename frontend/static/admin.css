@@ -23,6 +23,8 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
 }
 
 .stats-grid {
@@ -65,10 +67,18 @@ body {
     font-size: 16px;
 }
 
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-top: 20px;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 15px;
+    min-width: 600px;
 }
 
 th,
@@ -92,6 +102,8 @@ th {
     border-radius: 5px;
     margin: 10px 0;
     transition: .3s;
+    border: none;
+    cursor: pointer;
 }
 
 .btn:hover {
@@ -120,12 +132,19 @@ th {
     margin-bottom: 20px;
 }
 
-.login-box input[type="password"] {
+.login-box input[type="password"],
+.login-box input[type="text"] {
     width: 100%;
     padding: 10px;
     margin: 15px 0;
     border: 1px solid #ddd;
     border-radius: 4px;
+    color: #111;
+    background: #fff;
+}
+
+.login-box input::placeholder {
+    color: #999;
 }
 
 .login-box button {
@@ -155,6 +174,12 @@ th {
     backdrop-filter: blur(4px);
     justify-content: center;
     align-items: center;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.modal.show {
+    display: flex;
 }
 
 .modal-content {
@@ -165,6 +190,8 @@ th {
     box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
     position: relative;
     animation: modalFade 0.25s ease;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 @keyframes modalFade {
@@ -206,11 +233,17 @@ th {
     font-size: 15px;
     margin-bottom: 20px;
     transition: .2s;
+    color: #111;
+    background: #fff;
 }
 
 .modal-content input:focus {
     border-color: #0f62ff;
     box-shadow: 0 0 0 3px rgba(15,98,255,.15);
+}
+
+.modal-content input::placeholder {
+    color: #999;
 }
 
 .modal-btn {
@@ -238,6 +271,8 @@ th {
     color: #64748b;
     cursor: pointer;
     transition: .2s;
+    background: none;
+    border: none;
 }
 
 .close:hover {
@@ -265,82 +300,67 @@ th {
     background: #b91c1c;
 }
 
+.btn-view {
+    background: #17a2b8;
+    color: white;
+}
+
+.btn-view:hover {
+    background: #138496;
+}
+
+.btn-data-reset {
+    background: #17a2b8;
+    color: white;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    margin: 0 4px;
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+.btn-data-reset:hover {
+    background: #138496;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+}
+
+.btn-data-reset:active {
+    transform: translateY(0);
+}
+
 .admin-container,
 .admin-panel,
 .admin-header,
 .admin-grid,
 .admin-card {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 .admin-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
 .admin-card {
-  flex: 1 1 320px;
-  min-width: 280px;
+    flex: 1 1 320px;
+    min-width: 280px;
 }
 
 .admin-table-wrapper {
-  width: 100%;
-  overflow-x: auto;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .admin-table {
-  width: 100%;
-  min-width: 600px;
-}
-
-@media (max-width: 1024px) {
-  .admin-grid {
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 768px) {
-  .admin-header,
-  .admin-actions,
-  .admin-card {
     width: 100%;
-  }
-
-  .admin-card {
-    padding: 0.9rem;
-  }
-}
-
-@media (max-width: 600px) {
-  .admin-header h1,
-  .admin-header .subtitle {
-    font-size: 1rem;
-  }
-
-  .admin-table td,
-  .admin-table th {
-    padding: 0.5rem 0.6rem;
-  }
-}
-
-/* make registration number input text visible */
-.login-box input,
-.search-bar input,
-input[type="text"],
-input[type="password"],
-input[type="number"],
-input[type="email"],
-select,
-textarea {
-    color: #111;
-    background: #fff;
-}
-
-.login-box input::placeholder,
-.search-bar input::placeholder,
-input::placeholder {
-    color: #999;
+    min-width: 600px;
 }
 
 /* Interval Records Styles */
@@ -394,10 +414,905 @@ input::placeholder {
     opacity: 0.8;
 }
 
-.btn-view {
-    background: #17a2b8;
+.reset-options {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin: 20px 0;
 }
 
-.btn-view:hover {
-    background: #138496;
+.reset-option {
+    padding: 18px;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    background: #f9f9f9;
+    user-select: none;
+}
+
+.reset-option:hover {
+    border-color: #0f62ff;
+    background: #f0f7ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(15, 98, 255, 0.15);
+}
+
+.reset-option.selected {
+    border-color: #0f62ff;
+    background: #0f62ff;
+    color: white;
+    box-shadow: 0 6px 20px rgba(15, 98, 255, 0.3);
+}
+
+.option-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    display: block;
+}
+
+.option-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+    font-size: 15px;
+}
+
+.option-desc {
+    font-size: 13px;
+    opacity: 0.7;
+    line-height: 1.4;
+}
+
+.reset-option.selected .option-desc {
+    opacity: 0.9;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.confirm-message {
+    padding: 14px 16px;
+    margin: 18px 0;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    color: #856404;
+    text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.5;
+    display: none;
+}
+
+.confirm-message.show {
+    display: block;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+
+.btn-confirm {
+    background: #dc3545;
+    color: white;
+    padding: 12px 28px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+.btn-confirm:hover:not(:disabled) {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.btn-confirm:active {
+    transform: translateY(0);
+}
+
+.btn-cancel {
+    background: #6c757d;
+    color: white;
+    padding: 12px 28px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+.btn-cancel:hover:not(:disabled) {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+.btn-cancel:active {
+    transform: translateY(0);
+}
+
+.btn-confirm:disabled,
+.btn-cancel:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Action Buttons Container */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.action-buttons .btn {
+    margin: 0;
+    padding: 8px 14px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* Animation for button clicks */
+.btn:active {
+    transform: scale(0.98);
+}
+
+/* Make registration number input text visible */
+.login-box input,
+.search-bar input,
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="email"],
+select,
+textarea {
+    color: #111;
+    background: #fff;
+}
+
+.login-box input::placeholder,
+.search-bar input::placeholder,
+input::placeholder {
+    color: #999;
+}
+
+/* =====================
+   RESPONSIVE DESIGN
+   ===================== */
+
+/* Tablet (1024px and below) */
+@media (max-width: 1024px) {
+    .admin-grid {
+        flex-direction: column;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    .container {
+        padding: 15px;
+    }
+}
+
+/* Tablet (768px and below) */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    .container {
+        padding: 12px;
+        border-radius: 6px;
+    }
+
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .header h1 {
+        font-size: 20px;
+        width: 100%;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin: 15px 0;
+    }
+
+    .stat-card {
+        padding: 15px;
+    }
+
+    .stat-card h3 {
+        font-size: 12px;
+    }
+
+    .stat-card p {
+        font-size: 20px;
+        margin-top: 8px;
+    }
+
+    th, td {
+        padding: 8px;
+        font-size: 12px;
+    }
+
+    .action-buttons {
+        gap: 6px;
+    }
+
+    .action-buttons .btn {
+        padding: 6px 10px;
+        font-size: 10px;
+    }
+
+    .btn {
+        padding: 8px 12px;
+        font-size: 11px;
+        margin: 6px 0;
+        width: auto;
+    }
+
+    .btn-data-reset {
+        padding: 6px 10px;
+        margin: 0 2px;
+        font-size: 10px;
+    }
+
+    .modal-content {
+        padding: 20px;
+    }
+
+    .modal-content h2 {
+        font-size: 18px;
+        margin-bottom: 8px;
+    }
+
+    .modal-content p {
+        font-size: 12px;
+        margin-bottom: 15px;
+    }
+
+    .reset-options {
+        gap: 10px;
+        margin: 15px 0;
+    }
+
+    .reset-option {
+        padding: 12px;
+    }
+
+    .option-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+    }
+
+    .option-title {
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+
+    .option-desc {
+        font-size: 11px;
+    }
+
+    .modal-buttons {
+        gap: 8px;
+        margin-top: 15px;
+    }
+
+    .btn-confirm,
+    .btn-cancel {
+        padding: 10px 20px;
+        font-size: 12px;
+        min-width: 100px;
+    }
+
+    .interval-grid-admin {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 8px;
+    }
+
+    .interval-card-admin {
+        padding: 8px;
+        font-size: 11px;
+    }
+
+    .interval-time {
+        font-size: 10px;
+    }
+
+    .interval-status {
+        font-size: 14px;
+    }
+
+    .search-bar input {
+        font-size: 14px;
+        padding: 10px;
+    }
+
+    .login-box {
+        margin: 30px auto;
+        padding: 20px;
+    }
+
+    .login-box h2 {
+        font-size: 18px;
+    }
+
+    .login-box input {
+        padding: 10px;
+        font-size: 14px;
+    }
+
+    .login-box button {
+        padding: 10px;
+        font-size: 14px;
+    }
+}
+
+/* Mobile (480px and below) */
+@media (max-width: 480px) {
+    body {
+        padding: 5px;
+    }
+
+    .container {
+        padding: 10px;
+        border-radius: 4px;
+    }
+
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .header h1 {
+        font-size: 16px;
+        width: 100%;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin: 12px 0;
+    }
+
+    .stat-card {
+        padding: 12px;
+    }
+
+    .stat-card h3 {
+        font-size: 10px;
+    }
+
+    .stat-card p {
+        font-size: 18px;
+        margin-top: 6px;
+    }
+
+    .search-bar {
+        margin: 12px 0;
+    }
+
+    .search-bar input {
+        padding: 8px;
+        font-size: 13px;
+    }
+
+    th, td {
+        padding: 6px;
+        font-size: 10px;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+        width: 100%;
+        gap: 4px;
+    }
+
+    .action-buttons .btn {
+        width: 100%;
+        padding: 8px;
+        font-size: 11px;
+        margin: 2px 0;
+    }
+
+    .btn {
+        padding: 8px 10px;
+        font-size: 10px;
+        margin: 4px 0;
+        width: auto;
+    }
+
+    .btn-reset {
+        margin-right: 2px;
+    }
+
+    .btn-data-reset {
+        width: 100%;
+        padding: 8px;
+        margin: 4px 0;
+        font-size: 11px;
+    }
+
+    .login-box {
+        margin: 20px auto;
+        padding: 15px;
+        max-width: 100%;
+    }
+
+    .login-box h2 {
+        font-size: 16px;
+        margin-bottom: 15px;
+    }
+
+    .login-box input {
+        padding: 10px;
+        margin: 10px 0;
+        font-size: 14px;
+    }
+
+    .login-box button {
+        padding: 10px;
+        font-size: 14px;
+        margin-top: 8px;
+    }
+
+    .modal {
+        padding: 10px;
+    }
+
+    .modal-content {
+        width: 95%;
+        padding: 15px;
+        border-radius: 12px;
+        max-height: 85vh;
+    }
+
+    .modal-content h2 {
+        font-size: 16px;
+        margin-bottom: 8px;
+    }
+
+    .modal-content p {
+        font-size: 11px;
+        margin-bottom: 12px;
+    }
+
+    .modal-content label {
+        font-size: 11px;
+        margin-bottom: 6px;
+    }
+
+    .modal-content input {
+        padding: 10px;
+        font-size: 13px;
+        margin-bottom: 12px;
+    }
+
+    .close {
+        top: 10px;
+        right: 10px;
+        font-size: 24px;
+    }
+
+    .reset-options {
+        gap: 8px;
+        margin: 12px 0;
+    }
+
+    .reset-option {
+        padding: 10px;
+    }
+
+    .option-icon {
+        font-size: 20px;
+        margin-bottom: 6px;
+    }
+
+    .option-title {
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+
+    .option-desc {
+        font-size: 10px;
+    }
+
+    .confirm-message {
+        padding: 10px 12px;
+        font-size: 11px;
+        margin: 10px 0;
+    }
+
+    .modal-buttons {
+        gap: 8px;
+        margin-top: 12px;
+        flex-direction: column;
+    }
+
+    .btn-confirm,
+    .btn-cancel {
+        width: 100%;
+        padding: 10px;
+        font-size: 12px;
+        min-width: unset;
+    }
+
+    .interval-grid-admin {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        margin-top: 12px;
+    }
+
+    .interval-card-admin {
+        padding: 6px;
+        font-size: 9px;
+    }
+
+    .interval-time {
+        font-size: 8px;
+        margin-bottom: 4px;
+    }
+
+    .interval-status {
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+
+    .interval-marked {
+        font-size: 8px;
+    }
+}
+
+/* Very Small Devices (360px and below) */
+@media (max-width: 360px) {
+    .header h1 {
+        font-size: 14px;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-card p {
+        font-size: 16px;
+    }
+
+    th, td {
+        font-size: 9px;
+        padding: 4px;
+    }
+
+    .modal-content {
+        width: 95%;
+        padding: 12px;
+    }
+
+    .modal-buttons {
+        flex-direction: column;
+    }
+
+    .btn-confirm, .btn-cancel {
+        width: 100%;
+    }
+
+    .interval-grid-admin {
+        grid-template-columns: 1fr;
+    }
+
+    .action-buttons .btn {
+        font-size: 9px;
+        padding: 6px 8px;
+    }
+}
+
+/* Print Styles */
+@media print {
+    body {
+        background: white;
+        padding: 0;
+    }
+
+    .container {
+        box-shadow: none;
+        padding: 0;
+    }
+
+    .btn,
+    .close,
+    .action-buttons {
+        display: none;
+    }
+
+    .table-wrapper {
+        overflow: visible;
+    }
+
+    table {
+        min-width: 100%;
+    }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Add these styles to your admin.css */
+
+/* Toggle Buttons */
+.toggle-buttons {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.toggle-btn {
+    padding: 12px 24px;
+    background: #e9ecef;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    color: #666;
+}
+
+.toggle-btn:hover {
+    background: #dee2e6;
+}
+
+.toggle-btn.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+/* View Sections */
+.view-section {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Responsive Table Improvements */
+.responsive-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.responsive-table tbody tr {
+    transition: all 0.3s ease;
+}
+
+.responsive-table tbody tr:hover {
+    background: #f0f7ff;
+}
+
+/* Attendance Filters */
+.attendance-filters {
+    display: flex;
+    gap: 15px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.attendance-filters select {
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    min-width: 150px;
+}
+
+.attendance-filters select:focus {
+    outline: none;
+    border-color: #007bff;
+}
+
+/* Attendance Table */
+.attendance-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-top: 20px;
+}
+
+.attendance-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1000px;
+}
+
+.attendance-table th {
+    background: #007bff;
+    color: white;
+    padding: 12px 8px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.attendance-table td {
+    border: 1px solid #ddd;
+    padding: 10px 8px;
+    text-align: center;
+    font-size: 13px;
+}
+
+.attendance-table td[data-label] {
+    text-align: left;
+}
+
+.attendance-table td.interval-cell {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.attendance-table td.present-count {
+    color: #28a745;
+    font-weight: 700;
+}
+
+.attendance-table td.absent-count {
+    color: #dc3545;
+    font-weight: 700;
+}
+
+.attendance-table td.attendance-percent {
+    background: #f0f7ff;
+    color: #007bff;
+    font-weight: 700;
+}
+
+/* Mobile Table Adjustments */
+@media (max-width: 1024px) {
+    .attendance-filters {
+        flex-direction: column;
+    }
+
+    .attendance-filters select {
+        width: 100%;
+        min-width: unset;
+    }
+
+    .toggle-buttons {
+        gap: 8px;
+    }
+
+    .toggle-btn {
+        padding: 10px 16px;
+        font-size: 12px;
+        flex: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .responsive-table,
+    .attendance-table {
+        font-size: 11px;
+    }
+
+    .responsive-table th,
+    .attendance-table th {
+        padding: 8px 6px;
+        font-size: 11px;
+    }
+
+    .responsive-table td,
+    .attendance-table td {
+        padding: 8px 6px;
+        font-size: 10px;
+    }
+
+    .toggle-buttons {
+        gap: 5px;
+    }
+
+    .toggle-btn {
+        padding: 8px 12px;
+        font-size: 11px;
+        flex: 1;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .action-buttons .btn {
+        width: 100%;
+        padding: 6px 8px;
+        font-size: 10px;
+        margin: 2px 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .responsive-table,
+    .attendance-table {
+        font-size: 9px;
+        min-width: 500px;
+    }
+
+    .responsive-table th,
+    .attendance-table th {
+        padding: 6px 4px;
+        font-size: 9px;
+    }
+
+    .responsive-table td,
+    .attendance-table td {
+        padding: 6px 4px;
+        font-size: 8px;
+    }
+
+    .toggle-buttons {
+        gap: 4px;
+    }
+
+    .toggle-btn {
+        padding: 8px 10px;
+        font-size: 10px;
+        flex: 1;
+    }
+
+    .attendance-filters {
+        gap: 8px;
+    }
+
+    .attendance-filters select {
+        font-size: 12px;
+        padding: 8px 10px;
+    }
+
+    .action-buttons .btn {
+        width: 100%;
+        padding: 6px;
+        font-size: 9px;
+    }
 }
