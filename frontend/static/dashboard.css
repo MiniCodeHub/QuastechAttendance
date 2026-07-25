@@ -254,3 +254,179 @@ body.dashboard {
     }
 
 }
+
+/* Settings Navbar Styles */
+.settings-navbar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1.2rem;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    backdrop-filter: blur(10px);
+}
+
+.settings-navbar .nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.settings-navbar .nav-title {
+    color: white;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    letter-spacing: 0.5px;
+}
+
+.settings-navbar .nav-links {
+    display: flex;
+    gap: 0.7rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.settings-navbar .nav-link {
+    color: rgba(255, 255, 255, 0.95);
+    padding: 0.65rem 1.1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.settings-navbar .nav-link:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.settings-navbar .nav-link.active {
+    background: white;
+    color: #667eea;
+    border-color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.settings-navbar .nav-link.active:hover {
+    transform: translateY(-3px);
+}
+
+.settings-navbar .logout-btn {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+    color: white;
+    padding: 0.65rem 1.1rem;
+    border-radius: 6px;
+    border: 1.5px solid #ff5252;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.settings-navbar .logout-btn:hover {
+    background: linear-gradient(135deg, #ff5252 0%, #ff3838 100%);
+    border-color: #ff1744;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(255, 107, 107, 0.4);
+}
+
+.settings-navbar .logout-btn:active {
+    transform: translateY(-1px);
+}
+
+/* Dark Theme Support */
+body.dark-theme .settings-navbar {
+    background: linear-gradient(135deg, #2a3f5f 0%, #3d2645 100%);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-theme .settings-navbar .nav-link {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+body.dark-theme .settings-navbar .nav-link:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .settings-navbar .nav-container {
+        gap: 1rem;
+    }
+
+    .settings-navbar .nav-link {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .settings-navbar {
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .settings-navbar .nav-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.8rem;
+    }
+
+    .settings-navbar .nav-title {
+        font-size: 1.2rem;
+        width: 100%;
+    }
+
+    .settings-navbar .nav-links {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .settings-navbar .logout-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .settings-navbar .nav-link {
+        flex: 1;
+        justify-content: center;
+        padding: 0.7rem 0.8rem;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .settings-navbar .nav-title {
+        font-size: 1rem;
+    }
+
+    .settings-navbar .nav-link {
+        font-size: 0.8rem;
+        padding: 0.6rem 0.5rem;
+    }
+
+    .settings-navbar .logout-btn {
+        font-size: 0.8rem;
+        padding: 0.6rem 0.5rem;
+    }
+}

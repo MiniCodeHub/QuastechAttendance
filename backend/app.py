@@ -96,6 +96,20 @@ def timedelta_to_str(td):
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
     return str(td)
 
+# --- Helper: Get interval status ---
+def get_interval_status(current_time):
+    """Determine which interval the current time falls into (1-4 for 8-12)"""
+    hour = current_time.hour
+    if 8 <= hour < 9:
+        return 1
+    elif 9 <= hour < 10:
+        return 2
+    elif 10 <= hour < 11:
+        return 3
+    elif 11 <= hour < 12:
+        return 4
+    return None
+
 # --- Helper: Get month calendar data ---
 def get_month_calendar(reg_number, year, month):
     conn = get_db_connection()
@@ -454,12 +468,16 @@ def mark_attendance():
     current_time = now.time()
     current_date = now.date()
 
-    if current_time < time(8,0):
-        return jsonify({'success': False, 'message': 'Attendance window starts at 12:00 PM IST.'}), 400
-    if current_time >= time(12,0):
-        return jsonify({'success': False, 'message': 'Attendance window closed. Timeout.'}), 400
+    # Check if within attendance window
+    if current_time < time(8, 0):
+        return jsonify({'success': False, 'message': 'Attendance window starts at 8:00 AM IST.'}), 400
+    if current_time >= time(12, 0):
+        return jsonify({'success': False, 'message': 'Attendance window closed at 12:00 PM IST.'}), 400
 
-    status = 'Present' if current_time < time(13, 0) else 'Late'
+    # Get current interval
+    interval = get_interval_status(current_time)
+    if interval is None:
+        return jsonify({'success': False, 'message': 'Invalid attendance interval.'}), 400
 
     conn = get_db_connection()
     if not conn:
@@ -473,177 +491,77 @@ def mark_attendance():
             if student['year'] != year:
                 return jsonify({'success': False, 'message': f"Student is in {student['year']}, not {year}."}), 400
 
-            cur.execute("SELECT id FROM attendance WHERE registration_number = %s AND date = %s", (registration_number, current_date))
+            # Check if attendance already marked for this interval
+            cur.execute("""
+                SELECT id FROM attendance 
+                WHERE registration_number = %s AND date = %s AND interval_number = %s
+            """, (registration_number, current_date, interval))
             if cur.fetchone():
-                return jsonify({'success': False, 'message': 'Attendance already marked for today.'}), 400
+                return jsonify({'success': False, 'message': f'Attendance already marked for interval {interval} (hour {interval + 7}).'}), 400
 
-            cur.execute("SELECT registration_number FROM attendance WHERE device_fingerprint = %s AND date = %s", (device_fingerprint, current_date))
+            # Prevent device reuse for same interval
+            cur.execute("""
+                SELECT registration_number FROM attendance 
+                WHERE device_fingerprint = %s AND date = %s AND interval_number = %s
+            """, (device_fingerprint, current_date, interval))
             existing = cur.fetchone()
             if existing and existing['registration_number'] != registration_number:
-                return jsonify({'success': False, 'message': 'This device has already been used for attendance today.'}), 400
+                return jsonify({'success': False, 'message': f'This device has already been used for interval {interval} today.'}), 400
 
-            cur.execute(
-                "INSERT INTO attendance (registration_number, date, time_in, status, device_fingerprint) VALUES (%s, %s, %s, %s, %s)",
-                (registration_number, current_date, current_time, status, device_fingerprint)
-            )
+            # Record attendance for current interval
+            cur.execute("""
+                INSERT INTO attendance 
+                (registration_number, date, time_in, status, device_fingerprint, interval_number) 
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (registration_number, current_date, current_time, 'Present', device_fingerprint, interval))
             conn.commit()
-            return jsonify({'success': True, 'message': f'Attendance marked as {status}.', 'status': status})
+            
+            return jsonify({
+                'success': True, 
+                'message': f'Attendance marked for interval {interval} (hour {interval + 7}:00 - {interval + 8}:00).', 
+                'interval': interval,
+                'status': 'Present'
+            })
     finally:
         conn.close()
 
-# --- Download Report ---
-@app.route('/download_full_report', methods=['GET'])
-def download_full_report():
-    wb = Workbook()
-
-    # Sheet 1: Registrations
-    ws1 = wb.active
-    ws1.title = "Registrations"
+# Add new route to get student's attendance status for today
+@app.route('/get_daily_attendance_status')
+def get_daily_attendance_status():
+    if not session.get('student_logged_in'):
+        return jsonify({'success': False, 'message': 'Not logged in.'}), 401
+    
+    registration_number = session['registration_number']
+    current_date = datetime.now(IST).date()
+    
     conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT registration_number, name, mobile, year, course, password, registered_at FROM registrations ORDER BY registration_number")
-                regs = cur.fetchall()
-                if regs:
-                    ws1.append(['Registration Number', 'Name', 'Mobile', 'Year', 'Course', 'Password', 'Registered At'])
-                    for reg in regs:
-                        ws1.append([
-                            reg['registration_number'],
-                            reg['name'],
-                            reg['mobile'],
-                            reg['year'],
-                            reg.get('course', 'BCA'),
-                            reg['password'],
-                            reg['registered_at'].strftime('%Y-%m-%d %H:%M:%S') if reg['registered_at'] else ''
-                        ])
-        finally:
-            conn.close()
-
-    # Sheet 2: Attendance
-    ws2 = wb.create_sheet("Attendance")
-    conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT a.registration_number, r.name, a.date, a.time_in, a.status
-                    FROM attendance a
-                    JOIN registrations r ON a.registration_number = r.registration_number
-                    ORDER BY a.date DESC, a.registration_number
-                """)
-                atts = cur.fetchall()
-                if atts:
-                    ws2.append(['Registration Number', 'Name', 'Date', 'Time In', 'Status'])
-                    for att in atts:
-                        time_str = timedelta_to_str(att.get('time_in'))
-                        ws2.append([
-                            att['registration_number'],
-                            att['name'],
-                            att['date'].strftime('%Y-%m-%d') if att['date'] else '',
-                            time_str,
-                            att['status']
-                        ])
-        finally:
-            conn.close()
-
-    # Sheet 3: Student Slicer
-    ws3 = wb.create_sheet("Student Slicer")
-    now = datetime.now(IST)
-    current_month = now.month
-    current_year = now.year
-    conn = get_db_connection()
-    data_rows = []
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT a.registration_number, r.name, a.date, a.status,
-                           DAY(a.date) as day_of_month
-                    FROM attendance a
-                    JOIN registrations r ON a.registration_number = r.registration_number
-                    WHERE MONTH(a.date) = %s AND YEAR(a.date) = %s
-                    ORDER BY a.registration_number, a.date
-                """, (current_month, current_year))
-                records = cur.fetchall()
-                student_weekly = {}
-                for rec in records:
-                    reg_num = rec['registration_number']
-                    name = rec['name']
-                    day = rec['day_of_month']
-                    if day <= 7:
-                        week = 1
-                    elif day <= 14:
-                        week = 2
-                    elif day <= 21:
-                        week = 3
-                    else:
-                        week = 4
-                    status = rec['status']
-                    key = (reg_num, week)
-                    if key not in student_weekly:
-                        student_weekly[key] = {'Present':0, 'Late':0, 'Absent':0, 'Timeout':0, 'total_days':0, 'name':name}
-                    student_weekly[key][status] += 1
-                    student_weekly[key]['total_days'] += 1
-                for (reg_num, week), counts in student_weekly.items():
-                    total = counts['total_days']
-                    perc = round((counts['Present'] + counts['Late']) / total * 100, 2) if total > 0 else 0
-                    data_rows.append([
-                        reg_num,
-                        counts['name'],
-                        week,
-                        counts['Present'],
-                        counts['Late'],
-                        counts['Absent'],
-                        counts['Timeout'],
-                        total,
-                        perc
-                    ])
-        finally:
-            conn.close()
-
-    wb.create_sheet("WeeklyData")
-    ws_data = wb["WeeklyData"]
-    ws_data.sheet_state = 'hidden'
-    ws_data.append(['Reg Number', 'Name', 'Week', 'Present', 'Late', 'Absent', 'Timeout', 'Total Days', 'Attendance %'])
-    for row in data_rows:
-        ws_data.append(row)
-
-    ws3.title = "Student Slicer"
-    student_names = sorted(set(row[1] for row in data_rows))
-    if student_names:
-        dv = DataValidation(type="list", formula1='"{}"'.format(','.join(student_names)))
-        ws3.add_data_validation(dv)
-        dv.add('B1')
-        ws3['A1'] = "Select Student:"
-        ws3['B1'] = student_names[0]
-
-        ws3['A3'] = "Week"
-        ws3['B3'] = "Attendance %"
-        for i in range(1, 5):
-            ws3.cell(row=3+i, column=1, value=f"Week {i}")
-            ws3.cell(row=3+i, column=2).value = f'=SUMIFS(WeeklyData!I:I, WeeklyData!B:B, $B$1, WeeklyData!C:C, {i})'
-
-        chart_data = Reference(ws3, min_col=2, min_row=4, max_row=7)
-        categories = Reference(ws3, min_col=1, min_row=4, max_row=7)
-        chart = BarChart()
-        chart.title = "Weekly Attendance Percentage"
-        chart.x_axis.title = "Week"
-        chart.y_axis.title = "Percentage"
-        chart.add_data(chart_data, titles_from_data=False)
-        chart.set_categories(categories)
-        ws3.add_chart(chart, "D3")
-
-    file_bytes = BytesIO()
-    wb.save(file_bytes)
-    file_bytes.seek(0)
-    filename = "attendance_report.xlsx"
-    return send_file(
-        file_bytes,
-        as_attachment=True,
-        download_name=filename,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT interval_number, time_in, status 
+                FROM attendance 
+                WHERE registration_number = %s AND date = %s
+                ORDER BY interval_number
+            """, (registration_number, current_date))
+            records = cur.fetchall()
+            
+            attendance_status = {}
+            for record in records:
+                interval = record['interval_number']
+                attendance_status[interval] = {
+                    'time_in': record['time_in'].strftime('%H:%M:%S') if record['time_in'] else '',
+                    'status': record['status']
+                }
+            
+            return jsonify({
+                'success': True,
+                'attendance_status': attendance_status,
+                'marked_intervals': list(attendance_status.keys())
+            })
+    finally:
+        conn.close()
 
 # --- Scheduler ---
 scheduler = BackgroundScheduler()
