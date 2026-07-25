@@ -5,7 +5,7 @@
     <title>Admin Panel</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
 </head>
-<body>
+<body id="appBody">
 <div class="container">
     {% if session.admin_logged_in %}
         <div class="header">
@@ -38,6 +38,7 @@
                         <th>Course</th>
                         <th>Password</th>
                         <th>Registered At</th>
+                        <th>Today's Intervals</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -52,15 +53,28 @@
                         <td>{{ reg.password }}</td>
                         <td>{{ reg.registered_at.strftime('%Y-%m-%d %H:%M:%S') if reg.registered_at else '' }}</td>
                         <td>
+                            <button class="btn btn-view" onclick="viewIntervalRecords('{{ reg.registration_number }}', '{{ reg.name }}')">📊 View</button>
+                        </td>
+                        <td>
                             <button class="btn btn-reset" onclick="openResetModal('{{ reg.registration_number }}', '{{ reg.name }}')">🔑 Reset</button>
                             <button class="btn btn-delete" onclick="deleteRecord('{{ reg.registration_number }}')">🗑️ Delete</button>
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="8">No registrations found.</td></tr>
+                    <tr><td colspan="9">No registrations found.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Interval Records Modal -->
+        <div id="intervalModal" class="modal">
+            <div class="modal-content" style="width: min(90%, 600px);">
+                <span class="close" onclick="closeIntervalModal()">&times;</span>
+                <h2>Today's Interval Records</h2>
+                <p id="studentInfo"></p>
+                <div id="intervalRecordsContent" class="interval-grid-admin"></div>
+            </div>
         </div>
 
         <!-- Reset Password Modal -->
@@ -68,7 +82,7 @@
             <div class="modal-content">
                 <span class="close" onclick="closeResetModal()">&times;</span>
                 <h2>Reset Password</h2>
-                <p id="studentInfo"></p>
+                <p id="studentInfo2"></p>
                 <label>New Password:</label>
                 <input type="password" id="newPassword" placeholder="Enter new password" required>
                 <button class="modal-btn" onclick="confirmResetPassword()">Reset Password</button>

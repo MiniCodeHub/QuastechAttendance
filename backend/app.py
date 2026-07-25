@@ -568,8 +568,22 @@ def get_daily_attendance_status():
             attendance_status = {}
             for record in records:
                 interval = record['interval_number']
+                time_in = record['time_in']
+                
+                # Convert timedelta to string format
+                if isinstance(time_in, timedelta):
+                    total_seconds = int(time_in.total_seconds())
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    seconds = total_seconds % 60
+                    time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                elif isinstance(time_in, time):
+                    time_str = time_in.strftime('%H:%M:%S')
+                else:
+                    time_str = str(time_in) if time_in else ''
+                
                 attendance_status[interval] = {
-                    'time_in': record['time_in'].strftime('%H:%M:%S') if record['time_in'] else '',
+                    'time_in': time_str,
                     'status': record['status']
                 }
             
@@ -577,6 +591,57 @@ def get_daily_attendance_status():
                 'success': True,
                 'attendance_status': attendance_status,
                 'marked_intervals': list(attendance_status.keys())
+            })
+    finally:
+        conn.close()
+
+# Add the admin route for viewing student interval records
+@app.route('/admin/student_interval_records')
+def admin_student_interval_records():
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'message': 'Not authorized'}), 401
+    
+    reg_number = request.args.get('reg_number', '').strip()
+    current_date = datetime.now(IST).date()
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT interval_number, time_in, status 
+                FROM attendance 
+                WHERE registration_number = %s AND date = %s
+                ORDER BY interval_number
+            """, (reg_number, current_date))
+            records = cur.fetchall()
+            
+            interval_records = {}
+            for record in records:
+                interval = record['interval_number']
+                time_in = record['time_in']
+                
+                # Convert timedelta to string format
+                if isinstance(time_in, timedelta):
+                    total_seconds = int(time_in.total_seconds())
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    seconds = total_seconds % 60
+                    time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                elif isinstance(time_in, time):
+                    time_str = time_in.strftime('%H:%M:%S')
+                else:
+                    time_str = str(time_in) if time_in else ''
+                
+                interval_records[interval] = {
+                    'time_in': time_str,
+                    'status': record['status']
+                }
+            
+            return jsonify({
+                'success': True,
+                'records': interval_records
             })
     finally:
         conn.close()

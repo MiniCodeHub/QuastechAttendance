@@ -6,7 +6,7 @@
     <title>QUASTECH Profile</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='profile.css') }}">
 </head>
-<body class="home-page">
+<body class="home-page" id="appBody">
     <div class="home-header">
         <div class="home-brand">
             <div class="text-logo">QUASTECH</div>
@@ -47,6 +47,7 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
     <script src="{{ url_for('static', filename='profile.js') }}"></script>
 </body>
 </html>

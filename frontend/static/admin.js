@@ -203,6 +203,55 @@ async function searchStudents() {
 
 }
 
+function viewIntervalRecords(regNumber, studentName) {
+    document.getElementById("studentInfo").textContent = `Student: ${studentName} (${regNumber})`;
+    
+    fetch(`/admin/student_interval_records?reg_number=${regNumber}`)
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) {
+                document.getElementById('intervalRecordsContent').innerHTML = '<p>No records found</p>';
+                return;
+            }
+
+            const records = data.records;
+            const intervals = [
+                {num: 1, time: '8:00 - 9:00 AM'},
+                {num: 2, time: '9:00 - 10:00 AM'},
+                {num: 3, time: '10:00 - 11:00 AM'},
+                {num: 4, time: '11:00 - 12:00 PM'}
+            ];
+
+            let html = '<div class="interval-grid-admin">';
+            intervals.forEach(interval => {
+                const record = records[interval.num];
+                const status = record ? record.status : 'Not Marked';
+                const time = record ? record.time_in : '--:--:--';
+                const statusClass = status === 'Present' ? 'present' : status === 'Absent' ? 'absent' : 'pending';
+
+                html += `
+                    <div class="interval-card-admin ${statusClass}">
+                        <div class="interval-time">${interval.time}</div>
+                        <div class="interval-status">${status}</div>
+                        <div class="interval-marked">${time}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            document.getElementById('intervalRecordsContent').innerHTML = html;
+            document.getElementById('intervalModal').style.display = 'flex';
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error loading interval records');
+        });
+}
+
+function closeIntervalModal() {
+    document.getElementById('intervalModal').style.display = 'none';
+}
+
 window.addEventListener("click", function (event) {
 
     const modal = document.getElementById("resetModal");
