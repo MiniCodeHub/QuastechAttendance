@@ -3,36 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up - QUASTECH</title>
+    <title>Sign Up - QUASTECH Attendance</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='signup.css') }}">
 </head>
-<body>
-<div class="container">
-    <div class="text-logo">QUASTECH</div>
-    <div class="tagline">Create your account</div>
-    <form id="signupForm" class="form-card">
-        <h2>Student Sign Up</h2>
-        <label>Full Name</label>
-        <input type="text" id="name" placeholder="Full Name" required>
-        <label>Registration Number</label>
-        <input type="text" id="registration_number" placeholder="Registration Number" required>
-        <label>Mobile (10 digits)</label>
-        <input type="tel" id="mobile" placeholder="Mobile" required>
-        <label>Year</label>
-        <div class="year">
-            <label><input type="radio" name="year" value="FYBCA"> FYBCA</label>
-            <label><input type="radio" name="year" value="SYBCA"> SYBCA</label>
-            <label><input type="radio" name="year" value="TYBCA"> TYBCA</label>
-        </div>
-        <label>Password</label>
-        <input type="password" id="password" placeholder="Create Password (min 6 chars)" required>
-        <div id="signupMessage"></div>
-        <button type="submit">Submit</button>
-    </form>
-    <div class="auth-link">
-        Already have an account? <a href="{{ url_for('login') }}">Login</a>
+<body class="signup-page" id="appBody">
+    <!-- Logo & Header -->
+    <div class="header-section">
+        <h1 class="logo-text">QUASTECH</h1>
+        <p class="tagline">Create your account</p>
     </div>
-</div>
-<script src="{{ url_for('static', filename='signup.js') }}"></script>
+
+    <div class="signup-container">
+        <div class="signup-card">
+            <h2 class="card-title">Student Sign Up</h2>
+
+            {% if error %}
+            <div class="error-message">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST" id="signupForm">
+                <!-- Full Name -->
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input 
+                        type="text" 
+                        id="name" 
+                        name="name" 
+                        placeholder="Full Name"
+                        required
+                    >
+                </div>
+
+                <!-- Registration Number -->
+                <div class="form-group">
+                    <label for="registration_number">Registration Number</label>
+                    <input 
+                        type="text" 
+                        id="registration_number" 
+                        name="registration_number" 
+                        placeholder="Registration Number"
+                        required
+                    >
+                </div>
+
+                <!-- Mobile Number -->
+                <div class="form-group">
+                    <label for="mobile">Mobile Number</label>
+                    <input 
+                        type="tel" 
+                        id="mobile" 
+                        name="mobile" 
+                        placeholder="Mobile Number" 
+                        pattern="[0-9]{10}"
+                        required
+                    >
+                </div>
+
+                <!-- Year -->
+                <div class="form-group">
+                    <label for="year">Year</label>
+                    <select id="year" name="year" required>
+                        <option value="">Select Year</option>
+                        <option value="1st Year">1st Year</option>
+                        <option value="2nd Year">2nd Year</option>
+                        <option value="3rd Year">3rd Year</option>
+                    </select>
+                </div>
+
+                <!-- Course -->
+                <div class="form-group">
+                    <label for="course">Course (Optional)</label>
+                    <input 
+                        type="text" 
+                        id="course" 
+                        name="course" 
+                        placeholder="Course"
+                    >
+                </div>
+
+                <!-- Password -->
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        placeholder="Password" 
+                        minlength="6"
+                        required
+                    >
+                </div>
+
+                <!-- Confirm Password -->
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input 
+                        type="password" 
+                        id="confirm_password" 
+                        name="confirm_password" 
+                        placeholder="Confirm Password" 
+                        minlength="6"
+                        required
+                    >
+                    <small id="passwordMatch" style="display: none; color: #dc3545;">❌ Passwords do not match</small>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn-submit">Sign Up</button>
+            </form>
+
+            <!-- Login Link -->
+            <p class="login-link">
+                Already have an account? <a href="{{ url_for('login') }}">Login</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='signup.js') }}"></script>
 </body>
 </html>

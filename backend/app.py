@@ -194,55 +194,92 @@ def index():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        data = request.get_json()
-        name = data.get('name', '').strip()
-        reg_num = data.get('registration_number', '').strip()
-        mobile = data.get('mobile', '').strip()
-        year = data.get('year', '').strip()
-        password = data.get('password', '').strip()
+        # Handle both form data and JSON
+        if request.is_json:
+            data = request.get_json()
+            name = data.get('name', '').strip()
+            registration_number = data.get('registration_number', '').strip()
+            mobile = data.get('mobile', '').strip()
+            year = data.get('year', '').strip()
+            course = data.get('course', '').strip()
+            password = data.get('password', '').strip()
+            confirm_password = data.get('confirm_password', '').strip()
+        else:
+            name = request.form.get('name', '').strip()
+            registration_number = request.form.get('registration_number', '').strip()
+            mobile = request.form.get('mobile', '').strip()
+            year = request.form.get('year', '').strip()
+            course = request.form.get('course', '').strip()
+            password = request.form.get('password', '').strip()
+            confirm_password = request.form.get('confirm_password', '').strip()
 
-        # Admin shortcut
-        if reg_num.lower() == ADMIN_CODE:
-            session['admin_logged_in'] = True
-            return jsonify({'success': True, 'redirect': '/admin', 'message': 'Admin access granted!'}), 200
+        # Validate all fields
+        if not all([name, registration_number, mobile, year, password, confirm_password]):
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'All fields are required'})
+            return render_template('signup.html', error='All fields are required')
 
-        if not all([name, reg_num, mobile, year, password]):
-            return jsonify({'success': False, 'message': 'All fields are required.'}), 400
-        if len(mobile) != 10 or not mobile.isdigit():
-            return jsonify({'success': False, 'message': 'Mobile must be exactly 10 digits.'}), 400
-        if year not in ['FYBCA', 'SYBCA', 'TYBCA']:
-            return jsonify({'success': False, 'message': 'Invalid year.'}), 400
+        # Validate password match
+        if password != confirm_password:
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'Passwords do not match'})
+            return render_template('signup.html', error='Passwords do not match')
+
+        # Validate password length
         if len(password) < 6:
-            return jsonify({'success': False, 'message': 'Password must be at least 6 characters.'}), 400
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'Password must be at least 6 characters'})
+            return render_template('signup.html', error='Password must be at least 6 characters')
+
+        # Validate mobile length
+        if len(mobile) != 10 or not mobile.isdigit():
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'Mobile number must be 10 digits'})
+            return render_template('signup.html', error='Mobile number must be 10 digits')
 
         conn = get_db_connection()
         if not conn:
-            return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'Database connection failed'})
+            return render_template('signup.html', error='Database connection failed')
+
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT id FROM registrations WHERE registration_number = %s", (reg_num,))
-                if cur.fetchone():
-                    return jsonify({'success': False, 'message': 'Registration number already exists.'}), 400
-                cur.execute("SELECT id FROM registrations WHERE mobile = %s", (mobile,))
-                if cur.fetchone():
-                    return jsonify({'success': False, 'message': 'Mobile number already registered.'}), 400
-
+                # Check if registration number already exists
                 cur.execute(
-                    "INSERT INTO registrations (registration_number, name, mobile, year, password) VALUES (%s, %s, %s, %s, %s)",
-                    (reg_num, name, mobile, year, password)
+                    'SELECT * FROM registrations WHERE registration_number = %s',
+                    (registration_number,)
                 )
+                if cur.fetchone():
+                    if request.is_json:
+                        return jsonify({'success': False, 'message': 'Registration number already exists'})
+                    return render_template('signup.html', error='Registration number already exists')
+
+                # Insert new registration
+                cur.execute("""
+                    INSERT INTO registrations 
+                    (name, registration_number, mobile, year, course, password, registered_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (name, registration_number, mobile, year, course, password, datetime.now(IST)))
+
                 conn.commit()
                 
-                session['student_logged_in'] = True
-                session['registration_number'] = reg_num
-                session['student_name'] = name
+                if request.is_json:
+                    return jsonify({
+                        'success': True, 
+                        'message': 'Account created successfully!',
+                        'redirect': url_for('login_page')
+                    })
+                return redirect(url_for('login_page'))
                 
-                return jsonify({'success': True, 'redirect': '/dashboard', 'message': 'Signup successful!'})
-        except pymysql.IntegrityError as e:
-            return jsonify({'success': False, 'message': 'Database error: ' + str(e)}), 400
+        except Exception as e:
+            print(f"Signup error: {e}")
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'An error occurred. Please try again.'})
+            return render_template('signup.html', error='An error occurred. Please try again.')
         finally:
             conn.close()
-    
+
     return render_template('signup.html')
 
 @app.route('/login', methods=['GET', 'POST'])
