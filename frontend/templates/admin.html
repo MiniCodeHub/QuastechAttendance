@@ -57,7 +57,6 @@
                                 <th>Course</th>
                                 <th>Password</th>
                                 <th>Registered At</th>
-                                <th>Today's Intervals</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -79,9 +78,6 @@
                                                 {{ reg.registered_at.strftime('%Y-%m-%d %H:%M') }}
                                             {% endif %}
                                         </td>
-                                        <td data-label="Intervals">
-                                            <button class="btn btn-view" onclick="viewIntervals('{{ reg.registration_number }}')">View</button>
-                                        </td>
                                         <td data-label="Actions">
                                             <div class="action-buttons">
                                                 <button class="btn btn-reset" onclick="resetPassword('{{ reg.registration_number }}', '{{ reg.name }}')">Reset</button>
@@ -92,7 +88,7 @@
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="9" style="text-align: center; color: #999;">No students registered yet</td>
+                                    <td colspan="8" style="text-align: center; color: #999;">No students registered yet</td>
                                 </tr>
                             {% endif %}
                         </tbody>
@@ -129,10 +125,6 @@
                                 <th>Student Name</th>
                                 <th>Year</th>
                                 <th>Session</th>
-                                <th>Interval 1<br>(8-9 AM)</th>
-                                <th>Interval 2<br>(9-10 AM)</th>
-                                <th>Interval 3<br>(10-11 AM)</th>
-                                <th>Interval 4<br>(11-12 PM)</th>
                                 <th>Total Present</th>
                                 <th>Total Absent</th>
                                 <th>Attendance %</th>
@@ -146,10 +138,6 @@
                                         <td data-label="Name">{{ reg.name }}</td>
                                         <td data-label="Year">{{ reg.year }}</td>
                                         <td data-label="Session">2025-26</td>
-                                        <td data-label="Interval 1" class="interval-cell">-</td>
-                                        <td data-label="Interval 2" class="interval-cell">-</td>
-                                        <td data-label="Interval 3" class="interval-cell">-</td>
-                                        <td data-label="Interval 4" class="interval-cell">-</td>
                                         <td data-label="Total Present" class="present-count">0</td>
                                         <td data-label="Total Absent" class="absent-count">0</td>
                                         <td data-label="Attendance %" class="attendance-percent">0%</td>

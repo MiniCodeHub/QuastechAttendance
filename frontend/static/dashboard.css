@@ -4,6 +4,7 @@
     --card-bg: #ffffff;
     --text: #333333;
     --border: #ddd;
+    --shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
 body.dark-theme {
@@ -11,16 +12,18 @@ body.dark-theme {
     --card-bg: #16213e;
     --text: #e0e0e0;
     --border: #444;
+    --shadow: 0 2px 10px rgba(0,0,0,0.3);
 }
 
 body.dashboard {
     margin: 0;
-    font-family: Arial, sans-serif;
+    font-family: 'Segoe UI', Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
+    transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Dashboard Container */
+/* Container */
 .dashboard-container {
     max-width: 1200px;
     margin: 0 auto;
@@ -34,8 +37,8 @@ body.dashboard {
     align-items: center;
     padding: 15px 20px;
     background: var(--card-bg);
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
     margin-bottom: 20px;
 }
 
@@ -55,6 +58,10 @@ body.dashboard {
     color: #666;
 }
 
+body.dark-theme .student-reg {
+    color: #aaa;
+}
+
 .header-right {
     display: flex;
     align-items: center;
@@ -65,88 +72,307 @@ body.dashboard {
     height: 35px;
 }
 
-.btn.small {
+.nav-btn {
     padding: 8px 15px;
     text-decoration: none;
-    border-radius: 4px;
+    border-radius: 6px;
     color: white;
     background: #007bff;
     font-size: 13px;
-}
-.samll.logout{
-    text-decoration: none;
-}
-
-/* Navigation */
-
-.nav-section {
-    margin-bottom: 20px;
-    position: relative;
+    font-weight: 600;
+    transition: background 0.3s;
 }
 
-.nav-btn {
-    padding: 12px 24px;
-    background: #007bff;
-    color: white;
-    border: none;
+.nav-btn:hover {
+    background: #0056b3;
+}
+
+/* Settings Navbar */
+.settings-navbar {
+    padding: 1.2rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+}
+
+.settings-navbar .nav-links {
+    display: flex;
+    gap: 0.7rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.settings-navbar .nav-link {
+    padding: 0.65rem 1.1rem;
     border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(0, 123, 255, 0.08);
+    border: 1.5px solid rgba(0, 123, 255, 0.15);
     cursor: pointer;
-}
-
-.settings-dropdown {
-    background: var(--card-bg);
-    border-radius: 8px;
-    padding: 10px;
-    margin-top: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,.1);
-}
-
-.setting-item {
-    width: 100%;
-    border: none;
-    background: transparent;
+    white-space: nowrap;
     color: var(--text);
-    text-align: left;
-    padding: 10px;
-    cursor: pointer;
-    border-radius: 5px;
 }
 
-.setting-item:hover {
-    background: #f0f0f0;
+.settings-navbar .nav-link:hover {
+    background: rgba(0, 123, 255, 0.15);
+    border-color: rgba(0, 123, 255, 0.3);
+    transform: translateY(-2px);
 }
 
-/* Theme */
-
-.theme-options {
-    margin-top: 5px;
-    padding-left: 20px;
+.settings-navbar .nav-link.logout {
+    background: rgba(220, 53, 69, 0.1);
+    border-color: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
 }
 
-.theme-option {
-    padding: 8px 15px;
-    margin: 5px;
-    border: 1px solid var(--border);
-    background: var(--card-bg);
-    color: var(--text);
-    border-radius: 5px;
-    cursor: pointer;
+.settings-navbar .nav-link.logout:hover {
+    background: rgba(220, 53, 69, 0.2);
+    border-color: #dc3545;
 }
 
-.theme-option:hover {
-    background: #007bff;
-    color: white;
-}
-
-/* Calendar */
-
-.calendar-container {
+/* Stats Blocks */
+.stats-blocks {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
     margin-top: 20px;
+}
+
+.stat-block {
     background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
     padding: 20px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s;
+}
+
+.stat-block:hover {
+    transform: translateY(-4px);
+}
+
+.stat-block h3 {
+    color: #6c757d;
+    font-size: 15px;
+    margin: 0 0 10px 0;
+}
+
+.stat-block p {
+    font-size: 32px;
+    font-weight: bold;
+    margin: 0;
+}
+
+.stat-block.present p {
+    color: #28a745;
+}
+
+.stat-block.absent p {
+    color: #dc3545;
+}
+
+.stat-block.total p {
+    color: #000000;
+}
+
+body.dark-theme .stat-block.total p {
+    color: #ffffff;
+}
+
+/* ============================================
+   MINI INTERVAL BLOCKS INSIDE STATS
+   ============================================ */
+.stat-block .mini-intervals {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 4px 0;
+}
+
+.mini-block {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 28px;
+    color: white;
+    transition: transform 0.2s;
+    cursor: default;
+}
+
+.mini-block:hover {
+    transform: scale(1.1);
+}
+
+.mini-block.present {
+    background: #28a745;
+    border: 1px solid #1e7e34;
+}
+
+.mini-block.absent {
+    background: #dc3545;
+    border: 1px solid #a71d2a;
+}
+
+.mini-block.not-marked {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    opacity: 1;
+    color: #212529;
+}
+
+body.dark-theme .mini-block.present {
+    background: #28a745;
+    border-color: #1e7e34;
+}
+
+body.dark-theme .mini-block.absent {
+    background: #dc3545;
+    border-color: #a71d2a;
+}
+
+body.dark-theme .mini-block.not-marked {
+    background: #fef9e7;
+    border-color: #f9ca24;
+    opacity: 1;
+    color: #1a1a2e;
+}
+
+/* Responsive mini blocks */
+@media (max-width: 768px) {
+    .mini-block {
+        width: 24px;
+        height: 24px;
+        font-size: 8px;
+        line-height: 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .mini-block {
+        width: 20px;
+        height: 20px;
+        font-size: 7px;
+        line-height: 20px;
+    }
+}
+
+/* ============================================
+   INTERVAL RECORDS (CARDS)
+   ============================================ */
+.interval-records-container {
+    margin-top: 30px;
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+.interval-records-container h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: var(--text);
+}
+
+.interval-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+.interval-card {
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    border: 2px solid var(--border);
+    transition: all 0.3s ease;
+    background: var(--card-bg);
+}
+
+.interval-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+}
+
+.interval-card.present {
+    background: rgba(40, 167, 69, 0.1);
+    border-color: #28a745;
+    color: #28a745;
+}
+
+.interval-card.absent {
+    background: rgba(220, 53, 69, 0.1);
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.interval-card.pending {
+    background: rgba(255, 193, 7, 0.1);
+    border-color: #ffc107;
+    color: #856404;
+}
+
+.interval-time {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.interval-status {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.interval-marked {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+body.dark-theme .interval-card.present {
+    background: rgba(40, 167, 69, 0.25);
+    border-color: #28a745;
+    color: #6fcf97;
+}
+
+body.dark-theme .interval-card.absent {
+    background: rgba(220, 53, 69, 0.25);
+    border-color: #dc3545;
+    color: #f1948a;
+}
+
+body.dark-theme .interval-card.pending {
+    background: rgba(255, 193, 7, 0.25);
+    border-color: #ffc107;
+    color: #f9ca24;
+}
+
+/* ============================================
+   CALENDAR – 6 COLUMNS (Mon–Sat)
+   ============================================ */
+.calendar-container {
+    margin-top: 30px;
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+.calendar-container h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
 }
 
 .calendar-header {
@@ -180,11 +406,11 @@ body.dashboard {
 
 .calendar-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 8px;
 }
 
-.calendar-grid > div:nth-child(-n+7) {
+.calendar-grid > div:nth-child(-n+6) {
     font-weight: 600;
     text-align: center;
     padding: 10px;
@@ -192,391 +418,241 @@ body.dashboard {
     font-size: 12px;
 }
 
+body.dark-theme .calendar-grid > div:nth-child(-n+6) {
+    color: #aaa;
+}
+
+/* Calendar day cells */
 .calendar-day {
-    padding: 12px;
+    padding: 12px 4px;
     text-align: center;
     border-radius: 6px;
-    background: #f9f9f9;
+    background: var(--card-bg);
     border: 1px solid var(--border);
     cursor: pointer;
     transition: all 0.3s ease;
-    font-weight: 500;
-    min-height: 40px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    min-height: 50px;
+    position: relative;
 }
 
-.calendar-day:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+.calendar-day .day-number {
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.2;
+}
+
+.calendar-day .present-count {
+    font-size: 10px;
+    opacity: 0.8;
+    margin-top: 2px;
 }
 
 .calendar-day.Present {
     background: #28a745;
     color: white;
     border-color: #28a745;
-    font-weight: 600;
+}
+
+.calendar-day.Present .present-count {
+    color: #155724;
 }
 
 .calendar-day.Absent {
     background: #dc3545;
     color: white;
     border-color: #dc3545;
-    font-weight: 600;
 }
 
-.calendar-day.Late {
-    background: #ffc107;
-    color: black;
-    border-color: #ffc107;
-    font-weight: 600;
+.calendar-day.Absent .present-count {
+    color: #721c24;
 }
 
-.calendar-day.Sunday {
-    background: #6c757d;
-    color: white;
-    border-color: #6c757d;
-    font-weight: 600;
-}
-
-.calendar-day.other-month {
+.calendar-day.no-data {
     background: transparent;
     color: #ccc;
     border: none;
     cursor: default;
 }
 
-.calendar-day.other-month:hover {
-    transform: none;
-    box-shadow: none;
+/* Block past dates – greyed out, non‑clickable */
+.calendar-day.past-date {
+    background: #e9ecef !important;
+    color: #adb5bd !important;
+    cursor: not-allowed !important;
+    opacity: 0.6;
+    pointer-events: none;
+}
+.calendar-day.past-date.Present {
+    background: #d4edda !important;
+    color: #6c757d !important;
+}
+.calendar-day.past-date.Absent {
+    background: #f8d7da !important;
+    color: #6c757d !important;
+}
+body.dark-theme .calendar-day.past-date {
+    background: #2b2b2b !important;
+    color: #666 !important;
+}
+body.dark-theme .calendar-day.past-date.Present {
+    background: #1e3a2a !important;
+}
+body.dark-theme .calendar-day.past-date.Absent {
+    background: #3a1e1e !important;
 }
 
+/* Highlight selected date */
+.calendar-day.selected {
+    outline: 3px solid #007bff;
+    outline-offset: -2px;
+    transform: scale(1.02);
+    box-shadow: 0 0 15px rgba(0, 123, 255, 0.4);
+}
+
+.calendar-day.selected.Present {
+    outline-color: #1e7e34;
+}
+
+.calendar-day.selected.Absent {
+    outline-color: #a71d2a;
+}
+
+body.dark-theme .calendar-day.selected {
+    outline-color: #0f62ff;
+    box-shadow: 0 0 15px rgba(15, 98, 255, 0.5);
+}
+
+body.dark-theme .calendar-day.selected.Present {
+    outline-color: #28a745;
+}
+
+body.dark-theme .calendar-day.selected.Absent {
+    outline-color: #dc3545;
+}
+
+/* Dark theme calendar */
 body.dark-theme .calendar-day {
     background: #1e293b;
     border-color: #444;
 }
 
-body.dark-theme .calendar-day.other-month {
+body.dark-theme .calendar-day.Present {
+    background: #1e7e34;
+    border-color: #28a745;
+}
+
+body.dark-theme .calendar-day.Present .present-count {
+    color: #90ee90;
+}
+
+body.dark-theme .calendar-day.Absent {
+    background: #a71d2a;
+    border-color: #dc3545;
+}
+
+body.dark-theme .calendar-day.Absent .present-count {
+    color: #f8bbbb;
+}
+
+body.dark-theme .calendar-day.no-data {
     background: transparent;
+    color: #666;
+    border: none;
 }
 
-/* Statistics */
-
-.stats-blocks {
-    display: grid;
-    grid-template-columns: repeat(3,1fr);
-    gap: 20px;
-    margin-top: 20px;
-}
-
-.stat-block {
-    background: var(--card-bg);
-    padding: 20px;
-    border-radius: 8px;
-    text-align: center;
-    box-shadow: 0 2px 10px rgba(0,0,0,.1);
-}
-
-.stat-block h3 {
-    color: #6c757d;
-    font-size: 15px;
-}
-
-.stat-block p {
-    font-size: 32px;
-    font-weight: bold;
-    margin-top: 10px;
-}
-
-.stat-block.present p {
-    color: #28a745;
-}
-
-.stat-block.absent p {
-    color: #dc3545;
-}
-
-.stat-block.working p {
-    color: #007bff;
-}
-
-/* Responsive */
-
-@media (max-width:768px){
-
-    .dashboard-header{
-        flex-direction:column;
-        align-items:flex-start;
-        gap:10px;
-    }
-
-    .header-right{
-        width:100%;
-        justify-content:space-between;
-    }
-
-    .stats-blocks{
-        grid-template-columns:1fr;
-    }
-
-    .calendar-grid{
-        font-size:12px;
-    }
-
-}
-
-/* Settings Navbar Styles */
-.settings-navbar {
-    padding: 1.2rem;
-    border-radius: 10px;
-    margin-bottom: 2rem;
-    backdrop-filter: blur(10px);
-}
-
-.settings-navbar .nav-container {
-    color: black;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.settings-navbar .nav-title {
-    color: black;
-    font-size: 1.4rem;
-    font-weight: 700;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    letter-spacing: 0.5px;
-}
-a{
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-}
-
-.settings-navbar .nav-links {
-    
-    display: flex;
-    gap: 0.7rem;
-    align-items: center;
-    flex-wrap: wrap;
-    color: black;
-}
-
-.settings-navbar .nav-link {
-    padding: 0.65rem 1.1rem;
-    border-radius: 6px;
-    text-decoration: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    font-weight: 600;
-    font-size: 0.95rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: rgba(255, 255, 255, 0.15);
-    border: 1.5px solid rgba(255, 255, 255, 0.25);
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.settings-navbar .nav-link:hover {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: translateY(-3px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-}
-
-.settings-navbar .nav-link.active {
-    background: white;
-    border-color: white;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.settings-navbar .nav-link.active:hover {
-    transform: translateY(-3px);
-}
-
-.settings-navbar .logout-btn {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-    color: white;
-    padding: 0.65rem 1.1rem;
-    border-radius: 6px;
-    border: 1.5px solid #ff5252;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.95rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    white-space: nowrap;
-}
-
-.settings-navbar .logout-btn:hover {
-    background: linear-gradient(135deg, #ff5252 0%, #ff3838 100%);
-    border-color: #ff1744;
-    transform: translateY(-3px);
-    box-shadow: 0 6px 15px rgba(255, 107, 107, 0.4);
-}
-
-.settings-navbar .logout-btn:active {
-    transform: translateY(-1px);
-}
-
-/* Dark Theme Support */
-
-body.dark-theme .settings-navbar .nav-link {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
-}
-
-body.dark-theme .settings-navbar .nav-link:hover {
-    background: rgba(255, 255, 255, 0.15);
-}
-
-/* Responsive Design */
+/* ============================================
+   RESPONSIVE
+   ============================================ */
 @media (max-width: 1024px) {
-    .settings-navbar .nav-container {
-        gap: 1rem;
+    .stats-blocks {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
     }
-
-    .settings-navbar .nav-link {
-        padding: 0.6rem 1rem;
-        font-size: 0.9rem;
+    .interval-grid {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
 
 @media (max-width: 768px) {
-    .settings-navbar {
-        padding: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .settings-navbar .nav-container {
+    .dashboard-header {
         flex-direction: column;
-        align-items: stretch;
-        gap: 0.8rem;
+        align-items: flex-start;
+        gap: 10px;
     }
-
-    .settings-navbar .nav-title {
-        font-size: 1.2rem;
-        width: 100%;
-    }
-
-    .settings-navbar .nav-links {
+    .header-right {
         width: 100%;
         justify-content: space-between;
     }
-
-    .settings-navbar .logout-btn {
-        width: 100%;
+    .stats-blocks {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .interval-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    .settings-navbar .nav-links {
         justify-content: center;
     }
-
     .settings-navbar .nav-link {
         flex: 1;
         justify-content: center;
-        padding: 0.7rem 0.8rem;
+        padding: 0.6rem 0.8rem;
         font-size: 0.85rem;
     }
-}
-
-@media (max-width: 480px) {
-    .settings-navbar .nav-title {
-        font-size: 1rem;
+    .calendar-grid {
+        gap: 4px;
     }
-
-    .settings-navbar .nav-link {
-        font-size: 0.8rem;
-        padding: 0.6rem 0.5rem;
+    .calendar-day {
+        padding: 8px 2px;
+        min-height: 40px;
     }
-
-    .settings-navbar .logout-btn {
-        font-size: 0.8rem;
-        padding: 0.6rem 0.5rem;
+    .calendar-day .day-number {
+        font-size: 12px;
     }
-}
-
-/* Interval Records Section */
-.interval-records-container {
-    margin-top: 30px;
-    background: var(--card-bg);
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.interval-records-container h3 {
-    color: var(--text);
-    margin-top: 0;
-    margin-bottom: 20px;
-    font-size: 18px;
-}
-
-.interval-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-}
-
-.interval-card {
-    padding: 15px;
-    border-radius: 8px;
-    text-align: center;
-    border: 2px solid var(--border);
-    transition: all 0.3s ease;
-}
-
-.interval-card.present {
-    background: rgba(40, 167, 69, 0.1);
-    border-color: #28a745;
-    color: #28a745;
-}
-
-.interval-card.absent {
-    background: rgba(220, 53, 69, 0.1);
-    border-color: #dc3545;
-    color: #dc3545;
-}
-
-.interval-card.pending {
-    background: rgba(255, 193, 7, 0.1);
-    border-color: #ffc107;
-    color: #ffc107;
-}
-
-.interval-time {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 8px;
-}
-
-.interval-status {
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 8px;
-}
-
-.interval-marked {
-    font-size: 12px;
-    opacity: 0.8;
-}
-
-body.dark-theme .interval-card {
-    border-color: rgba(255, 255, 255, 0.2);
-}
-
-@media (max-width: 768px) {
-    .interval-grid {
-        grid-template-columns: repeat(2, 1fr);
+    .calendar-day .present-count {
+        font-size: 8px;
     }
 }
 
 @media (max-width: 480px) {
+    .dashboard-container {
+        padding: 10px;
+    }
     .interval-grid {
         grid-template-columns: 1fr;
+    }
+    .stats-blocks {
+        grid-template-columns: 1fr;
+    }
+    .calendar-grid {
+        gap: 4px;
+    }
+    .calendar-day {
+        padding: 6px 2px;
+        min-height: 32px;
+    }
+    .calendar-day .day-number {
+        font-size: 10px;
+    }
+    .calendar-day .present-count {
+        font-size: 7px;
+    }
+    .settings-navbar .nav-link {
+        font-size: 0.8rem;
+        padding: 0.5rem;
+    }
+}
+
+/* Accessibility: reduce motion */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
     }
 }

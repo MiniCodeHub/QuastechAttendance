@@ -8,6 +8,7 @@
 </head>
 <body class="dashboard" id="appBody">
 <div class="dashboard-container">
+
     <!-- Header -->
     <div class="dashboard-header">
         <div class="student-info">
@@ -20,34 +21,35 @@
         </div>
     </div>
 
-    <!-- Simple Settings Navbar -->
+    <!-- Settings Navbar -->
     <div class="settings-navbar">
         <div class="nav-links">
-            <a href="/profile" class="nav-link">
-                <span>👤</span> Profile
-            </a>
-            <a href="#" class="nav-link" onclick="toggleTheme(); return false;">
-                <span>🎨</span> Theme
-            </a>
-            <a href="/logout" class="nav-link logout">
-                <span>🚪</span> Logout
-            </a>
+            <a href="/profile" class="nav-link"><span>👤</span> Profile</a>
+            <a href="#" class="nav-link" onclick="toggleTheme(); return false;"><span>🎨</span> Theme</a>
+            <a href="/logout" class="nav-link logout"><span>🚪</span> Logout</a>
         </div>
     </div>
 
-    <!-- Stats Blocks -->
+    <!-- Stats Blocks – Order: Present Hours → Absent → Total Hours -->
     <div class="stats-blocks">
+        <!-- 1st Block: Present Hours -->
         <div class="stat-block present">
-            <h3>Present</h3>
-            <p>{{ stats.present }}</p>
+            <h3>Present Hours</h3>
+            <p id="presentHoursDisplay">{{ stats.present_hours }}</p>
+            <div class="mini-intervals" id="presentMiniBlocks"></div>
         </div>
+
+        <!-- 2nd Block: Absent -->
         <div class="stat-block absent">
-            <h3>Absent</h3>
-            <p>{{ stats.absent }}</p>
+            <h3>Absent Hours</h3>
+            <p id="absentCount">{{ stats.absent }}</p>
+            <div class="mini-intervals" id="absentMiniBlocks"></div>
         </div>
-        <div class="stat-block working">
-            <h3>Working Days</h3>
-            <p>{{ stats.working_days }}</p>
+
+        <!-- 3rd Block: Total Hours -->
+        <div class="stat-block total">
+            <h3>Total Hours</h3>
+            <p id="totalHoursDisplay">{{ stats.total_hours }}</p>
         </div>
     </div>
 
@@ -59,7 +61,7 @@
         </div>
     </div>
 
-    <!-- Calendar Container (Always Visible) -->
+    <!-- Calendar -->
     <div class="calendar-container" id="calendarContainer">
         <h3>📅 Monthly Attendance Calendar</h3>
         <div class="calendar-header">
@@ -69,9 +71,9 @@
         </div>
         <div class="calendar-grid" id="calendarGrid"></div>
     </div>
+
 </div>
 
 <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
-<script src="{{ url_for('static', filename='dashboard-intervals.js') }}"></script>
 </body>
 </html>

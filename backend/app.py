@@ -9,8 +9,10 @@ from pymysql.cursors import DictCursor
 import pytz
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, Reference
+from openpyxl.chart.label import DataLabelList
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.worksheet.table import Table, TableStyleInfo
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 
@@ -28,7 +30,9 @@ app = Flask(
 )
 app.secret_key = os.urandom(24)
 
-# --- Database Configuration ---
+# ============================================================
+# DATABASE CONFIGURATION – LOCAL MYSQL (XAMPP)
+# ============================================================
 DB_CONFIG = {
     "host": "gateway01.ap-southeast-1.prod.aws.tidbcloud.com",
     "port": 4000,
@@ -51,60 +55,111 @@ GPS_RADIUS_METERS = 200
 
 IST = pytz.timezone('Asia/Kolkata')
 
+# --- Fingerprint retention: 1 day ---
+DAYS_TO_KEEP_FINGERPRINT = 1
+
 # --- Helper Functions ---
 
 def haversine(lat1, lon1, lat2, lon2):
-    """Calculate distance between two GPS coordinates in meters"""
-    R = 6371000  # Earth radius in metres
+    R = 6371000
     lat1 = math.radians(lat1)
     lon1 = math.radians(lon1)
     lat2 = math.radians(lat2)
     lon2 = math.radians(lon2)
     dlat = lat2 - lat1
     dlon = lon2 - lon1
-    a = (
-        math.sin(dlat / 2) ** 2
-        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-    )
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    a = math.sin(dlat/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin(dlon/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return R * c
 
 def get_db_connection():
-    """Get database connection"""
     try:
         return pymysql.connect(**DB_CONFIG)
     except Exception as e:
         print(f"❌ Database connection error: {e}")
         return None
 
-def mark_absent_students():
-    """Mark absent students automatically at 10 PM"""
+def is_sunday(target_date):
+    if isinstance(target_date, datetime):
+        return target_date.weekday() == 6
+    if isinstance(target_date, date):
+        return target_date.weekday() == 6
+    return False
+
+# ============================================================
+# AUTO-ABSENT (4 intervals, 8-12)
+# ============================================================
+def mark_absent_for_interval(interval_num):
+    print(f"🔄 Running mark_absent_for_interval({interval_num}) at {datetime.now(IST)}")
     today = datetime.now(IST).date()
+
+    if is_sunday(today):
+        print(f"⏭️ Sunday detected, skipping auto-absent for {today}")
+        return
+
     conn = get_db_connection()
     if not conn:
+        print("❌ Database connection failed")
         return
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT registration_number FROM registrations")
             all_students = [row['registration_number'] for row in cur.fetchall()]
-            cur.execute("SELECT registration_number FROM attendance WHERE date = %s", (today,))
-            present_today = [row['registration_number'] for row in cur.fetchall()]
-            absent_students = set(all_students) - set(present_today)
+            print(f"📋 Total students: {len(all_students)}")
+
+            cur.execute("""
+                SELECT registration_number FROM attendance
+                WHERE date = %s AND interval_number = %s
+            """, (today, interval_num))
+            marked = {row['registration_number'] for row in cur.fetchall()}
+            print(f"✅ Students who marked interval {interval_num}: {len(marked)}")
+
             now_time = datetime.now(IST).time()
-            for reg_num in absent_students:
-                cur.execute(
-                    "INSERT INTO attendance (registration_number, date, time_in, status, device_fingerprint) VALUES (%s, %s, %s, %s, %s)",
-                    (reg_num, today, now_time, 'Absent', 'auto_absent')
-                )
+            absent_count = 0
+            for reg_num in all_students:
+                if reg_num not in marked:
+                    cur.execute("""
+                        INSERT IGNORE INTO attendance
+                        (registration_number, date, time_in, status, device_fingerprint, interval_number)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (reg_num, today, now_time, 'Absent', 'auto_absent', interval_num))
+                    absent_count += 1
             conn.commit()
-            print(f"✅ Marked {len(absent_students)} students as Absent for {today}")
+            print(f"✅ Marked Absent for {absent_count} students in interval {interval_num} on {today}")
     except Exception as e:
-        print(f"❌ Auto-absent error: {e}")
+        print(f"❌ Error marking absent for interval {interval_num}: {e}")
+    finally:
+        conn.close()
+
+def backfill_past_intervals():
+    now = datetime.now(IST)
+    current_hour = now.hour
+    interval_end_hours = {1: 9, 2: 10, 3: 11, 4: 12}
+    print("⏳ Checking for past intervals to backfill...")
+    for interval, end_hour in interval_end_hours.items():
+        if current_hour >= end_hour:
+            print(f"⏳ Backfilling interval {interval} (ended at {end_hour}:00)")
+            mark_absent_for_interval(interval)
+        else:
+            print(f"⏳ Interval {interval} not yet ended (ends at {end_hour}:00)")
+
+def cleanup_old_fingerprints():
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        cutoff = datetime.now(IST).date() - timedelta(days=DAYS_TO_KEEP_FINGERPRINT)
+        with conn.cursor() as cur:
+            cur.execute("UPDATE attendance SET device_fingerprint = NULL WHERE date < %s", (cutoff,))
+            updated = cur.rowcount
+            conn.commit()
+            print(f"🧹 Cleared fingerprints from {updated} attendance records older than {cutoff}")
+    except Exception as e:
+        print(f"❌ Fingerprint cleanup error: {e}")
     finally:
         conn.close()
 
 def get_interval_status(current_time):
-    """Determine which interval the current time falls into (1-4 for 8-12)"""
     hour = current_time.hour
     if 8 <= hour < 9:
         return 1
@@ -117,7 +172,6 @@ def get_interval_status(current_time):
     return None
 
 def get_month_calendar(reg_number, year, month):
-    """Get attendance data for a specific month"""
     conn = get_db_connection()
     if not conn:
         return {}
@@ -125,60 +179,166 @@ def get_month_calendar(reg_number, year, month):
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT date, status FROM attendance 
-                WHERE registration_number = %s AND YEAR(date) = %s AND MONTH(date) = %s
+                WHERE registration_number = %s
+                  AND YEAR(date) = %s
+                  AND MONTH(date) = %s
+                  AND DAYOFWEEK(date) <> 1
             """, (reg_number, year, month))
             records = cur.fetchall()
-            attendance_map = {row['date'].day: row['status'] for row in records}
-            return attendance_map
+            day_data = {}
+            for row in records:
+                day = row['date'].day
+                status = row['status']
+                if day not in day_data:
+                    day_data[day] = {'present_count': 0, 'status': 'Absent'}
+                if status == 'Present':
+                    day_data[day]['present_count'] += 1
+                    day_data[day]['status'] = 'Present'
+            return day_data
     finally:
         conn.close()
 
+# ============================================================
+# TODAY'S STATS (for dashboard blocks)
+# ============================================================
 def get_dashboard_stats(reg_number):
-    """Get dashboard statistics for a student"""
     conn = get_db_connection()
     if not conn:
-        return {'present': 0, 'absent': 0, 'working_days': 0}
+        return {'present_hours': 0, 'absent': 0, 'total_hours': 0}
     try:
         with conn.cursor() as cur:
             today = datetime.now(IST).date()
-            first_day = today.replace(day=1)
-            
+            if is_sunday(today):
+                return {'present_hours': 0, 'absent': 0, 'total_hours': 0}
+
             cur.execute("""
-                SELECT COUNT(CASE WHEN status IN ('Present', 'Late') THEN 1 END) as present,
+                SELECT COUNT(CASE WHEN status IN ('Present', 'Late') THEN 1 END) as present_hours,
                        COUNT(CASE WHEN status = 'Absent' THEN 1 END) as absent
                 FROM attendance 
-                WHERE registration_number = %s AND date BETWEEN %s AND %s
-            """, (reg_number, first_day, today))
+                WHERE registration_number = %s
+                  AND date = %s
+                  AND DAYOFWEEK(date) <> 1
+            """, (reg_number, today))
             stats = cur.fetchone()
-            
-            working_days = 0
-            for d in range((today - first_day).days + 1):
-                current_date = first_day + timedelta(days=d)
-                if current_date.weekday() != 6:
-                    working_days += 1
-            
+            present_hours = stats.get('present_hours', 0) or 0
+            absent = stats.get('absent', 0) or 0
+            total_hours = present_hours + absent
             return {
-                'present': stats.get('present', 0) if stats else 0,
-                'absent': stats.get('absent', 0) if stats else 0,
-                'working_days': working_days
+                'present_hours': present_hours,
+                'absent': absent,
+                'total_hours': total_hours
             }
     finally:
         conn.close()
 
-# --- PUBLIC ROUTES ---
+# ============================================================
+# DAY SUMMARY (for a specific date)
+# ============================================================
+@app.route('/get_day_summary')
+def get_day_summary():
+    if not session.get('student_logged_in'):
+        return jsonify({'success': False, 'message': 'Not logged in.'}), 401
+    registration_number = session['registration_number']
+    date_str = request.args.get('date')
+    if not date_str:
+        return jsonify({'success': False, 'message': 'Date parameter required'}), 400
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
 
+    if is_sunday(target_date):
+        return jsonify({
+            'success': True,
+            'present_hours': 0,
+            'absent': 0,
+            'total_hours': 0
+        })
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(CASE WHEN status IN ('Present', 'Late') THEN 1 END) as present_hours,
+                       COUNT(CASE WHEN status = 'Absent' THEN 1 END) as absent
+                FROM attendance 
+                WHERE registration_number = %s AND date = %s AND DAYOFWEEK(date) <> 1
+            """, (registration_number, target_date))
+            stats = cur.fetchone()
+            present_hours = stats.get('present_hours', 0) or 0
+            absent = stats.get('absent', 0) or 0
+            total_hours = present_hours + absent
+            return jsonify({
+                'success': True,
+                'present_hours': present_hours,
+                'absent': absent,
+                'total_hours': total_hours
+            })
+    finally:
+        conn.close()
+
+@app.route('/get_attendance_for_date')
+def get_attendance_for_date():
+    if not session.get('student_logged_in'):
+        return jsonify({'success': False, 'message': 'Not logged in.'}), 401
+    registration_number = session['registration_number']
+    date_str = request.args.get('date')
+    if not date_str:
+        return jsonify({'success': False, 'message': 'Date parameter required'}), 400
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT interval_number, time_in, status 
+                FROM attendance 
+                WHERE registration_number = %s AND date = %s
+                ORDER BY interval_number
+            """, (registration_number, target_date))
+            records = cur.fetchall()
+            attendance_status = {}
+            for record in records:
+                interval = record['interval_number']
+                time_in = record['time_in']
+                if isinstance(time_in, timedelta):
+                    total_seconds = int(time_in.total_seconds())
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    seconds = total_seconds % 60
+                    time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                elif isinstance(time_in, time):
+                    time_str = time_in.strftime('%H:%M:%S')
+                else:
+                    time_str = str(time_in) if time_in else ''
+                attendance_status[interval] = {
+                    'time_in': time_str,
+                    'status': record['status']
+                }
+            return jsonify({
+                'success': True,
+                'attendance_status': attendance_status,
+                'marked_intervals': list(attendance_status.keys())
+            })
+    finally:
+        conn.close()
+
+# --- PUBLIC ROUTES ---
 @app.route('/')
 def index():
-    """Home page"""
     if session.get('student_logged_in'):
         return redirect(url_for('dashboard'))
     return render_template('index.html')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    """Student signup route"""
     if request.method == 'POST':
-        # Handle both form data and JSON
         if request.is_json:
             data = request.get_json()
             name = data.get('name', '').strip()
@@ -197,11 +357,9 @@ def signup():
             password = request.form.get('password', '').strip()
             confirm_password = request.form.get('confirm_password', '').strip()
 
-        # Convert year to display format
         year_map = {'1': 'FYBCA', '2': 'SYBCA', '3': 'TYBCA'}
         year_value = year_map.get(year, year).strip()
 
-        # Validation
         if not all([name, registration_number, mobile, year_value, password, confirm_password]):
             error_msg = 'All fields are required'
             if request.is_json:
@@ -241,34 +399,26 @@ def signup():
 
         try:
             with conn.cursor() as cur:
-                # Check if registration number exists
-                cur.execute(
-                    'SELECT * FROM registrations WHERE registration_number = %s',
-                    (registration_number,)
-                )
+                cur.execute('SELECT * FROM registrations WHERE registration_number = %s', (registration_number,))
                 if cur.fetchone():
                     error_msg = 'Registration number already exists'
                     if request.is_json:
                         return jsonify({'success': False, 'message': error_msg})
                     return render_template('signup.html', error=error_msg)
 
-                # Insert new student
                 cur.execute("""
                     INSERT INTO registrations 
                     (name, registration_number, mobile, year, course, password, registered_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """, (name, registration_number, mobile, year_value, course, password, datetime.now(IST)))
-
                 conn.commit()
-                
                 if request.is_json:
                     return jsonify({
-                        'success': True, 
+                        'success': True,
                         'message': 'Account created successfully!',
                         'redirect': url_for('login')
                     })
                 return redirect(url_for('login'))
-                
         except Exception as e:
             print(f"Signup error: {e}")
             error_msg = 'An error occurred. Please try again.'
@@ -277,14 +427,11 @@ def signup():
             return render_template('signup.html', error=error_msg)
         finally:
             conn.close()
-
     return render_template('signup.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Student login route"""
     if request.method == 'POST':
-        # Handle both form data and JSON
         if request.is_json:
             data = request.get_json()
             registration_number = data.get('registration_number', '').strip()
@@ -293,26 +440,23 @@ def login():
             registration_number = request.form.get('registration_number', '').strip()
             password = request.form.get('password', '').strip()
 
-        # Validation
         if not registration_number or not password:
             error_msg = 'Registration number and password are required'
             if request.is_json or request.headers.get('Accept') == 'application/json':
                 return jsonify({'success': False, 'message': error_msg})
             return render_template('login.html', error=error_msg)
 
-        # Check if admin
         if registration_number == 'admin' and password == '1246':
             session['admin_logged_in'] = True
             if request.is_json or request.headers.get('Accept') == 'application/json':
                 return jsonify({
                     'success': True,
                     'message': 'Admin login successful!',
-                    'redirect': '/admin',  # ✅ CHANGED: Direct URL instead of url_for()
+                    'redirect': '/admin',
                     'is_admin': True
                 })
-            return redirect('/admin')  # ✅ CHANGED: Direct URL instead of url_for()
+            return redirect('/admin')
 
-        # Continue with student login...
         conn = get_db_connection()
         if not conn:
             error_msg = 'Database connection failed'
@@ -322,42 +466,26 @@ def login():
 
         try:
             with conn.cursor() as cur:
-                # Check if user exists
-                cur.execute(
-                    'SELECT * FROM registrations WHERE registration_number = %s',
-                    (registration_number,)
-                )
+                cur.execute('SELECT * FROM registrations WHERE registration_number = %s', (registration_number,))
                 user = cur.fetchone()
-
-                if not user:
+                if not user or user['password'] != password:
                     error_msg = 'Invalid registration number or password'
                     if request.is_json or request.headers.get('Accept') == 'application/json':
                         return jsonify({'success': False, 'message': error_msg})
                     return render_template('login.html', error=error_msg)
 
-                # Check password
-                if user['password'] != password:
-                    error_msg = 'Invalid registration number or password'
-                    if request.is_json or request.headers.get('Accept') == 'application/json':
-                        return jsonify({'success': False, 'message': error_msg})
-                    return render_template('login.html', error=error_msg)
-
-                # Set session variables
                 session['user_id'] = user['id']
                 session['registration_number'] = user['registration_number']
                 session['student_name'] = user['name']
                 session['student_logged_in'] = True
 
-                # Return JSON response or redirect
                 if request.is_json or request.headers.get('Accept') == 'application/json':
                     return jsonify({
                         'success': True,
                         'message': 'Login successful!',
                         'redirect': url_for('dashboard')
                     })
-                
                 return redirect(url_for('dashboard'))
-
         except Exception as e:
             print(f"Login error: {e}")
             error_msg = 'An error occurred. Please try again.'
@@ -366,51 +494,40 @@ def login():
             return render_template('login.html', error=error_msg)
         finally:
             conn.close()
-
     return render_template('login.html')
 
 @app.route('/dashboard')
 def dashboard():
-    """Student dashboard"""
     if not session.get('student_logged_in'):
         return redirect(url_for('login'))
-    
     reg_number = session['registration_number']
-    stats = get_dashboard_stats(reg_number)
-    
+    stats = get_dashboard_stats(reg_number)  # Today's stats
     today = datetime.now(IST).date()
-    current_month = today.month
-    current_year = today.year
-    
-    return render_template('dashboard.html', 
+    return render_template('dashboard.html',
                          student_name=session['student_name'],
                          reg_number=reg_number,
                          stats=stats,
-                         current_month=current_month,
-                         current_year=current_year)
+                         current_month=today.month,
+                         current_year=today.year)
 
 @app.route('/logout')
 def logout():
-    """Logout route"""
     session.clear()
     return redirect(url_for('index'))
 
 @app.route('/profile')
 def profile():
-    """Student profile page"""
     if not session.get('student_logged_in'):
         return redirect(url_for('login'))
-    
     reg_number = session['registration_number']
     conn = get_db_connection()
     if not conn:
         return render_template('profile.html', student_name=session['student_name'], reg_number=reg_number, student_data={})
-    
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM registrations WHERE registration_number = %s", (reg_number,))
             student_data = cur.fetchone()
-        return render_template('profile.html', 
+        return render_template('profile.html',
                              student_name=session['student_name'],
                              reg_number=reg_number,
                              student_data=student_data)
@@ -419,34 +536,26 @@ def profile():
 
 @app.route('/calendar_data')
 def calendar_data():
-    """Get calendar data for attendance"""
     if not session.get('student_logged_in'):
         return jsonify({'success': False, 'message': 'Not logged in.'}), 401
-    
     year = request.args.get('year', type=int, default=datetime.now(IST).year)
     month = request.args.get('month', type=int, default=datetime.now(IST).month)
-    
     reg_number = session['registration_number']
-    attendance_map = get_month_calendar(reg_number, year, month)
-    
-    return jsonify({'success': True, 'data': attendance_map})
+    day_data = get_month_calendar(reg_number, year, month)
+    return jsonify({'success': True, 'data': day_data})
 
 @app.route('/attendance_page')
 def attendance_page():
-    """Attendance marking page"""
     if not session.get('student_logged_in'):
         return redirect(url_for('login'))
     return render_template('attendance_form.html')
 
 @app.route('/get_daily_attendance_status')
 def get_daily_attendance_status():
-    """Get today's attendance status"""
     if not session.get('student_logged_in'):
         return jsonify({'success': False, 'message': 'Not logged in.'}), 401
-    
     registration_number = session['registration_number']
     current_date = datetime.now(IST).date()
-    
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
@@ -459,12 +568,10 @@ def get_daily_attendance_status():
                 ORDER BY interval_number
             """, (registration_number, current_date))
             records = cur.fetchall()
-            
             attendance_status = {}
             for record in records:
                 interval = record['interval_number']
                 time_in = record['time_in']
-                
                 if isinstance(time_in, timedelta):
                     total_seconds = int(time_in.total_seconds())
                     hours = total_seconds // 3600
@@ -475,12 +582,10 @@ def get_daily_attendance_status():
                     time_str = time_in.strftime('%H:%M:%S')
                 else:
                     time_str = str(time_in) if time_in else ''
-                
                 attendance_status[interval] = {
                     'time_in': time_str,
                     'status': record['status']
                 }
-            
             return jsonify({
                 'success': True,
                 'attendance_status': attendance_status,
@@ -491,7 +596,6 @@ def get_daily_attendance_status():
 
 @app.route('/get_session_data')
 def get_session_data():
-    """Get session data"""
     if session.get('student_logged_in'):
         return jsonify({
             'registration_number': session.get('registration_number'),
@@ -499,11 +603,9 @@ def get_session_data():
         })
     return jsonify({'success': False})
 
-# --- ATTENDANCE API ---
-
+# --- ATTENDANCE API (8-12, 4 intervals) ---
 @app.route('/mark_attendance', methods=['POST'])
 def mark_attendance():
-    """Mark student attendance"""
     data = request.get_json()
     registration_number = data.get('registration_number', '').strip()
     year = data.get('year', '').strip()
@@ -511,13 +613,12 @@ def mark_attendance():
     longitude = data.get('longitude')
     device_fingerprint = data.get('device_fingerprint', '').strip()
 
-    # Check for admin code
     if registration_number.lower() == ADMIN_CODE.lower():
         session['admin_logged_in'] = True
         return jsonify({
-            'success': True, 
+            'success': True,
             'message': 'Admin access granted!',
-            'redirect': '/admin',  # ✅ CHANGED: Direct URL instead of url_for()
+            'redirect': '/admin',
             'is_admin': True
         }), 200
 
@@ -536,16 +637,17 @@ def mark_attendance():
     if not device_fingerprint:
         return jsonify({'success': False, 'message': 'Device fingerprint not available.'}), 400
 
-    # Check GPS distance
-    distance = haversine(COLLEGE_LAT, COLLEGE_LON, float(latitude), float(longitude))
-    if distance > GPS_RADIUS_METERS:
-        return jsonify({'success': False, 'message': f'You are not within college campus. Distance: {int(distance)} meters.'}), 400
-
     now = datetime.now(IST)
     current_time = now.time()
     current_date = now.date()
 
-    # Check time window
+    if is_sunday(current_date):
+        return jsonify({'success': False, 'message': 'Sunday is a holiday. Attendance is not counted on Sundays.'}), 400
+
+    distance = haversine(COLLEGE_LAT, COLLEGE_LON, float(latitude), float(longitude))
+    if distance > GPS_RADIUS_METERS:
+        return jsonify({'success': False, 'message': f'You are not within college campus. Distance: {int(distance)} meters.'}), 400
+
     if current_time < time(8, 0):
         return jsonify({'success': False, 'message': 'Attendance window starts at 8:00 AM IST.'}), 400
     if current_time >= time(12, 0):
@@ -558,9 +660,9 @@ def mark_attendance():
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
+
     try:
         with conn.cursor() as cur:
-            # Verify student
             cur.execute("SELECT year FROM registrations WHERE registration_number = %s", (registration_number,))
             student = cur.fetchone()
             if not student:
@@ -568,46 +670,61 @@ def mark_attendance():
             if student['year'] != year:
                 return jsonify({'success': False, 'message': f"Student is in {student['year']}, not {year}."}), 400
 
-            # Check if already marked
             cur.execute("""
-                SELECT id FROM attendance 
+                SELECT id, status, device_fingerprint FROM attendance 
                 WHERE registration_number = %s AND date = %s AND interval_number = %s
             """, (registration_number, current_date, interval))
-            if cur.fetchone():
-                return jsonify({'success': False, 'message': f'Attendance already marked for interval {interval} (hour {interval + 7}).'}), 400
+            existing = cur.fetchone()
 
-            # Check device duplicate
+            if existing:
+                if existing['status'] == 'Absent' and existing['device_fingerprint'] == 'auto_absent':
+                    cur.execute("""
+                        UPDATE attendance 
+                        SET time_in = %s, status = 'Present', device_fingerprint = %s
+                        WHERE id = %s
+                    """, (current_time, device_fingerprint, existing['id']))
+                    conn.commit()
+                    return jsonify({
+                        'success': True,
+                        'message': f'Attendance updated to Present for interval {interval} (overrode auto-absent).',
+                        'interval': interval,
+                        'status': 'Present'
+                    })
+                else:
+                    return jsonify({'success': False, 'message': f'Attendance already marked for interval {interval}.'}), 400
+
             cur.execute("""
                 SELECT registration_number FROM attendance 
                 WHERE device_fingerprint = %s AND date = %s AND interval_number = %s
             """, (device_fingerprint, current_date, interval))
-            existing = cur.fetchone()
-            if existing and existing['registration_number'] != registration_number:
+            existing_device = cur.fetchone()
+            if existing_device and existing_device['registration_number'] != registration_number:
                 return jsonify({'success': False, 'message': f'This device has already been used for interval {interval} today.'}), 400
 
-            # Insert attendance
             cur.execute("""
                 INSERT INTO attendance 
                 (registration_number, date, time_in, status, device_fingerprint, interval_number) 
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (registration_number, current_date, current_time, 'Present', device_fingerprint, interval))
             conn.commit()
-            
+
             return jsonify({
-                'success': True, 
-                'message': f'Attendance marked for interval {interval} (hour {interval + 7}:00 - {interval + 8}:00).', 
+                'success': True,
+                'message': f'Attendance marked for interval {interval} (hour {interval + 7}:00 - {interval + 8}:00).',
                 'interval': interval,
                 'status': 'Present'
             })
+
+    except Exception as e:
+        print(f"❌ Mark attendance error: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         conn.close()
 
 # --- ADMIN ROUTES ---
-
 @app.route('/admin_panel', methods=['GET', 'POST'])
-@app.route('/admin', methods=['GET', 'POST'])  # ✅ Both routes handled by same function
+@app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
-    """Admin panel"""
     if request.method == 'POST':
         password = request.form.get('password')
         if password == '1246':
@@ -615,14 +732,11 @@ def admin_panel():
             return redirect(url_for('admin_panel'))
         else:
             return render_template('admin.html', error="Wrong password")
-    
     if not session.get('admin_logged_in'):
         return render_template('admin.html', error=None)
-    
     conn = get_db_connection()
     registrations = []
     total_registrations = 0
-    
     if conn:
         try:
             with conn.cursor() as cur:
@@ -631,23 +745,18 @@ def admin_panel():
                 total_registrations = len(registrations)
         finally:
             conn.close()
-    
     return render_template('admin.html', registrations=registrations, total_registrations=total_registrations)
 
 @app.route('/admin/search')
 def admin_search():
-    """Search students"""
     if not session.get('admin_logged_in'):
         return jsonify({'success': False, 'message': 'Not authorized.'}), 401
-    
     query = request.args.get('q', '').strip()
     if not query:
         return jsonify({'success': True, 'data': []})
-    
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
-    
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -662,31 +771,24 @@ def admin_search():
 
 @app.route('/admin/logout')
 def admin_logout():
-    """Admin logout"""
     session.pop('admin_logged_in', None)
     return redirect(url_for('index'))
 
 @app.route('/admin/reset_password', methods=['POST'])
 def admin_reset_password():
-    """Reset student password"""
     if not session.get('admin_logged_in'):
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
-    
     data = request.json
     reg_number = data.get('registration_number')
     new_password = data.get('new_password', '123456').strip()
-    
     if not new_password or len(new_password) < 6:
         return jsonify({'success': False, 'message': 'Password must be at least 6 characters'})
-    
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed'}), 500
-    
     try:
         with conn.cursor() as cur:
-            cur.execute("UPDATE registrations SET password = %s WHERE registration_number = %s", 
-                       (new_password, reg_number))
+            cur.execute("UPDATE registrations SET password = %s WHERE registration_number = %s", (new_password, reg_number))
             conn.commit()
         return jsonify({'success': True, 'new_password': new_password})
     except Exception as e:
@@ -696,17 +798,13 @@ def admin_reset_password():
 
 @app.route('/admin/delete_student', methods=['POST'])
 def admin_delete_student():
-    """Delete student and attendance"""
     if not session.get('admin_logged_in'):
         return jsonify({'success': False, 'message': 'Unauthorized'})
-    
     data = request.json
     reg_number = data.get('registration_number')
-    
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed'}), 500
-    
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM attendance WHERE registration_number = %s", (reg_number,))
@@ -720,42 +818,32 @@ def admin_delete_student():
 
 @app.route('/admin/reset_attendance', methods=['POST'])
 def admin_reset_attendance():
-    """Reset attendance records only"""
     if not session.get('admin_logged_in'):
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
-    
     data = request.json
     reg_number = data.get('registration_number', '').strip()
-    
     if not reg_number:
         return jsonify({'success': False, 'message': 'Registration number is required'}), 400
-    
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed'}), 500
-    
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT name FROM registrations WHERE registration_number = %s", (reg_number,))
             student = cur.fetchone()
-            
             if not student:
                 return jsonify({'success': False, 'message': 'Student not found'}), 400
-            
             cur.execute("SELECT COUNT(*) as count FROM attendance WHERE registration_number = %s", (reg_number,))
             count_result = cur.fetchone()
             records_deleted = count_result.get('count', 0) if count_result else 0
-            
             cur.execute("DELETE FROM attendance WHERE registration_number = %s", (reg_number,))
             conn.commit()
-            
             return jsonify({
                 'success': True,
                 'message': 'Attendance records reset successfully',
                 'student_name': student['name'],
                 'records_deleted': records_deleted
             })
-            
     except Exception as e:
         print(f"Error resetting attendance: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -764,51 +852,39 @@ def admin_reset_attendance():
 
 @app.route('/admin/reset_all_data', methods=['POST'])
 def admin_reset_all_data():
-    """Reset all data for student"""
     if not session.get('admin_logged_in'):
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
-    
     data = request.json
     reg_number = data.get('registration_number', '').strip()
     confirm = data.get('confirm', False)
-    
     if not reg_number:
         return jsonify({'success': False, 'message': 'Registration number is required'}), 400
-    
     if not confirm:
         return jsonify({
             'success': False,
             'message': 'Confirmation required',
             'requires_confirmation': True
         }), 400
-    
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed'}), 500
-    
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT name FROM registrations WHERE registration_number = %s", (reg_number,))
             student = cur.fetchone()
-            
             if not student:
                 return jsonify({'success': False, 'message': 'Student not found'}), 400
-            
             cur.execute("SELECT COUNT(*) as count FROM attendance WHERE registration_number = %s", (reg_number,))
             attendance_count = cur.fetchone().get('count', 0)
-            
             cur.execute("DELETE FROM attendance WHERE registration_number = %s", (reg_number,))
             cur.execute("DELETE FROM registrations WHERE registration_number = %s", (reg_number,))
-            
             conn.commit()
-            
             return jsonify({
                 'success': True,
                 'message': 'Student and all records deleted permanently',
                 'deleted_student': student['name'],
                 'deleted_attendance_records': attendance_count
             })
-            
     except Exception as e:
         print(f"Error resetting all data: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -817,17 +893,13 @@ def admin_reset_all_data():
 
 @app.route('/admin/student_interval_records')
 def admin_student_interval_records():
-    """Get student interval records"""
     if not session.get('admin_logged_in'):
         return jsonify({'success': False, 'message': 'Not authorized'}), 401
-    
     reg_number = request.args.get('reg_number', '').strip()
     current_date = datetime.now(IST).date()
-    
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed'}), 500
-    
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -837,12 +909,10 @@ def admin_student_interval_records():
                 ORDER BY interval_number
             """, (reg_number, current_date))
             records = cur.fetchall()
-            
             interval_records = {}
             for record in records:
                 interval = record['interval_number']
                 time_in = record['time_in']
-                
                 if isinstance(time_in, timedelta):
                     total_seconds = int(time_in.total_seconds())
                     hours = total_seconds // 3600
@@ -853,12 +923,10 @@ def admin_student_interval_records():
                     time_str = time_in.strftime('%H:%M:%S')
                 else:
                     time_str = str(time_in) if time_in else ''
-                
                 interval_records[interval] = {
                     'time_in': time_str,
                     'status': record['status']
                 }
-            
             return jsonify({
                 'success': True,
                 'records': interval_records
@@ -866,121 +934,216 @@ def admin_student_interval_records():
     finally:
         conn.close()
 
+# ============================================================
+# DOWNLOAD FULL REPORT – 4 SHEETS (NO SLICER, NO CHART)
+# ============================================================
 @app.route('/download_full_report')
 def download_full_report():
-    """Download attendance report as Excel"""
     if not session.get('admin_logged_in'):
         return redirect(url_for('login'))
-    
+
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed'}), 500
-    
+
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT registration_number, name, mobile, year, course, registered_at 
-                FROM registrations 
+                SELECT registration_number, name, mobile, year, course, registered_at
+                FROM registrations
                 ORDER BY registered_at DESC
             """)
             registrations = cur.fetchall()
-            
+
+            cur.execute("""
+                SELECT registration_number, date, time_in, status, interval_number, device_fingerprint
+                FROM attendance
+                WHERE DAYOFWEEK(date) <> 1
+                ORDER BY date, registration_number
+            """)
+            attendance_records = cur.fetchall()
+
             cur.execute("""
                 SELECT 
-                    registration_number,
-                    COUNT(*) as total_days,
-                    SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present_days,
-                    SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent_days,
-                    SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late_days
-                FROM attendance
-                GROUP BY registration_number
+                    r.name,
+                    r.registration_number,
+                    YEAR(a.date) as year,
+                    MONTH(a.date) as month,
+                    WEEK(a.date, 1) as week,
+                    SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) as present_count,
+                    SUM(CASE WHEN a.status = 'Absent' THEN 1 ELSE 0 END) as absent_count
+                FROM attendance a
+                JOIN registrations r ON a.registration_number = r.registration_number
+                WHERE DAYOFWEEK(a.date) <> 1
+                GROUP BY r.name, r.registration_number, YEAR(a.date), MONTH(a.date), WEEK(a.date, 1)
+                ORDER BY year DESC, month DESC, week, r.name
             """)
-            attendance_summary = {row['registration_number']: row for row in cur.fetchall()}
-        
-        # Create Excel workbook
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Attendance Report"
-        
-        headers = ['Registration Number', 'Name', 'Mobile', 'Year', 'Course', 'Registered At', 
-                   'Total Days', 'Present', 'Absent', 'Late', 'Attendance %']
-        ws.append(headers)
-        
-        for cell in ws[1]:
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-        
-        for reg in registrations:
-            reg_num = reg['registration_number']
-            summary = attendance_summary.get(reg_num, {})
-            
-            total_days = summary.get('total_days', 0) or 0
-            present = summary.get('present_days', 0) or 0
-            absent = summary.get('absent_days', 0) or 0
-            late = summary.get('late_days', 0) or 0
-            
-            attendance_pct = (present / total_days * 100) if total_days > 0 else 0
-            registered_at = reg['registered_at'].strftime('%Y-%m-%d %H:%M:%S') if reg['registered_at'] else ''
-            
-            ws.append([
-                reg_num,
-                reg['name'],
-                reg['mobile'],
-                reg['year'],
-                reg['course'] or 'BCA',
-                registered_at,
-                total_days,
-                present,
-                absent,
-                late,
-                f"{attendance_pct:.2f}%"
-            ])
-        
-        # Set column widths
-        ws.column_dimensions['A'].width = 18
-        ws.column_dimensions['B'].width = 20
-        ws.column_dimensions['C'].width = 12
-        ws.column_dimensions['D'].width = 12
-        ws.column_dimensions['E'].width = 12
-        ws.column_dimensions['F'].width = 20
-        ws.column_dimensions['G'].width = 12
-        ws.column_dimensions['H'].width = 10
-        ws.column_dimensions['I'].width = 10
-        ws.column_dimensions['J'].width = 10
-        ws.column_dimensions['K'].width = 15
-        
-        # Create file
-        file_stream = BytesIO()
-        wb.save(file_stream)
-        file_stream.seek(0)
-        
-        return send_file(
-            file_stream,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'attendance_report_{datetime.now(IST).strftime("%Y%m%d_%H%M%S")}.xlsx'
-        )
-    
+            weekly_data = cur.fetchall()
+
+            cur.execute("""
+                SELECT interval_number,
+                       COUNT(CASE WHEN status = 'Present' THEN 1 END) as present_total,
+                       COUNT(CASE WHEN status = 'Absent' THEN 1 END) as absent_total
+                FROM attendance
+                WHERE interval_number IS NOT NULL
+                  AND DAYOFWEEK(date) <> 1
+                GROUP BY interval_number
+                ORDER BY interval_number
+            """)
+            interval_summary = cur.fetchall()
+
     except Exception as e:
-        print(f"Error generating report: {e}")
+        print(f"Error fetching data: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         conn.close()
 
-# --- SCHEDULER ---
+    wb = Workbook()
+    wb.remove(wb.active)
 
-scheduler = BackgroundScheduler()
+    # ============================================================
+    # SHEET 1: Registrations
+    # ============================================================
+    ws1 = wb.create_sheet("Registrations")
+    headers1 = ['Registration Number', 'Name', 'Mobile', 'Year', 'Course', 'Registered At']
+    ws1.append(headers1)
+    for reg in registrations:
+        registered_at = reg['registered_at'].strftime('%Y-%m-%d %H:%M:%S') if reg['registered_at'] else ''
+        ws1.append([
+            reg['registration_number'],
+            reg['name'],
+            reg['mobile'],
+            reg['year'],
+            reg['course'] or 'BCA',
+            registered_at
+        ])
+    for col in range(1, 7):
+        ws1.column_dimensions[chr(64 + col)].width = 18
+
+    # ============================================================
+    # SHEET 2: Attendance (all records)
+    # ============================================================
+    ws2 = wb.create_sheet("Attendance")
+    headers2 = ['Registration Number', 'Date', 'Time In', 'Status', 'Interval Number', 'Device Fingerprint']
+    ws2.append(headers2)
+    for rec in attendance_records:
+        time_in = rec['time_in']
+        if isinstance(time_in, timedelta):
+            total_seconds = int(time_in.total_seconds())
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            seconds = total_seconds % 60
+            time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        elif isinstance(time_in, time):
+            time_str = time_in.strftime('%H:%M:%S')
+        else:
+            time_str = str(time_in) if time_in else ''
+        ws2.append([
+            rec['registration_number'],
+            rec['date'].strftime('%Y-%m-%d') if rec['date'] else '',
+            time_str,
+            rec['status'],
+            rec['interval_number'],
+            rec['device_fingerprint'] or ''
+        ])
+    for col in range(1, 7):
+        ws2.column_dimensions[chr(64 + col)].width = 18
+
+    # ============================================================
+    # SHEET 3: Student Week-wise Summary (no slicer, plain table)
+    # ============================================================
+    ws3 = wb.create_sheet("Student Week-wise")
+    headers3 = ['Student Name', 'Registration Number', 'Year', 'Month', 'Week', 'Present', 'Absent', 'Total Days', 'Attendance %']
+    ws3.append(headers3)
+    for row in weekly_data:
+        name = row['name']
+        reg_num = row['registration_number']
+        year = row['year']
+        month = row['month']
+        week = row['week']
+        present = row['present_count']
+        absent = row['absent_count']
+        total = present + absent
+        att_pct = round(present / total * 100, 2) if total > 0 else 0
+        ws3.append([name, reg_num, year, month, week, present, absent, total, att_pct])
+
+    # Optionally add auto-filter for convenience (but not required)
+    # ws3.auto_filter.ref = ws3.dimensions
+
+    for col in range(1, 10):
+        ws3.column_dimensions[chr(64 + col)].width = 15
+
+    # ============================================================
+    # SHEET 4: Interval Analysis (data only, no chart)
+    # ============================================================
+    ws4 = wb.create_sheet("Interval Analysis")
+    headers4 = ['Interval', 'Present Count', 'Absent Count']
+    ws4.append(headers4)
+    for row in interval_summary:
+        ws4.append([f"Interval {row['interval_number']}", row['present_total'], row['absent_total']])
+
+    for col in range(1, 4):
+        ws4.column_dimensions[chr(64 + col)].width = 18
+
+    # ============================================================
+    # Save and send file
+    # ============================================================
+    file_stream = BytesIO()
+    wb.save(file_stream)
+    file_stream.seek(0)
+
+    return send_file(
+        file_stream,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'attendance_report_{datetime.now(IST).strftime("%Y%m%d_%H%M%S")}.xlsx'
+    )
+
+# --- MANUAL TRIGGER (debugging) ---
+@app.route('/test_absent/<int:interval>')
+def test_absent(interval):
+    if 1 <= interval <= 4:
+        mark_absent_for_interval(interval)
+        return f"✅ Manually triggered absent for interval {interval}"
+    else:
+        return "❌ Invalid interval (1-4)"
+
+# --- SCHEDULER (4 intervals) ---
+scheduler = BackgroundScheduler(timezone=IST)
+
+interval_end_times = [
+    (1, 9, 0),
+    (2, 10, 0),
+    (3, 11, 0),
+    (4, 12, 0)
+]
+
+for interval, hour, minute in interval_end_times:
+    scheduler.add_job(
+        mark_absent_for_interval,
+        'cron',
+        hour=hour,
+        minute=minute,
+        args=[interval],
+        timezone=IST,
+        id=f'absent_interval_{interval}'
+    )
+    print(f"📅 Scheduled absent for interval {interval} at {hour:02d}:{minute:02d} IST")
+
 scheduler.add_job(
-    mark_absent_students,
+    cleanup_old_fingerprints,
     'cron',
-    hour=22,
+    hour=0,
     minute=1,
-    timezone=IST
+    timezone=IST,
+    id='fingerprint_cleanup'
 )
-scheduler.start()
 
-# --- MAIN ---
+scheduler.start()
+print("✅ Scheduler started.")
+for job in scheduler.get_jobs():
+    print(f"  - {job.id} | next run: {job.next_run_time}")
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    backfill_past_intervals()
+    app.run(debug=False, host='0.0.0.0', port=5000)
