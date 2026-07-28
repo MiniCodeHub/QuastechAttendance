@@ -198,15 +198,15 @@ def get_month_calendar(reg_number, year, month):
 def get_dashboard_stats(reg_number):
     conn = get_db_connection()
     if not conn:
-        return {'present_hours': 0, 'absent': 0, 'total_hours': 0}
+        return {'present_days': 0, 'absent': 0, 'total_days': 0}
     try:
         with conn.cursor() as cur:
             today = datetime.now(IST).date()
             if is_sunday(today):
-                return {'present_hours': 0, 'absent': 0, 'total_hours': 0}
+                return {'present_days': 0, 'absent': 0, 'total_days': 0}
 
             cur.execute("""
-                SELECT COUNT(CASE WHEN status IN ('Present', 'Late') THEN 1 END) as present_hours,
+                SELECT COUNT(CASE WHEN status IN ('Present', 'Late') THEN 1 END) as present_days,
                        COUNT(CASE WHEN status = 'Absent' THEN 1 END) as absent
                 FROM attendance 
                 WHERE registration_number = %s
@@ -214,13 +214,13 @@ def get_dashboard_stats(reg_number):
                   AND DAYOFWEEK(date) <> 1
             """, (reg_number, today))
             stats = cur.fetchone()
-            present_hours = stats.get('present_hours', 0) or 0
+            present_days = stats.get('present_days', 0) or 0
             absent = stats.get('absent', 0) or 0
-            total_hours = present_hours + absent
+            total_days = present_days + absent
             return {
-                'present_hours': present_hours,
+                'present_days': present_days,
                 'absent': absent,
-                'total_hours': total_hours
+                'total_days': total_days
             }
     finally:
         conn.close()
