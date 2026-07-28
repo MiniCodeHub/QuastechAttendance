@@ -36,51 +36,32 @@ body.dashboard {
     justify-content: space-between;
     align-items: center;
     padding: 15px 20px;
-    background: var(--card-bg);
     border-radius: 12px;
-    box-shadow: var(--shadow);
     margin-bottom: 20px;
 }
 
-.student-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.student-name {
-    font-size: 20px;
-    font-weight: bold;
-    color: #007bff;
-}
-
-.student-reg {
-    font-size: 14px;
-    color: #666;
-}
-
-body.dark-theme .student-reg {
-    color: #aaa;
-}
-
+/* ensure header-right items (toggle) sit on the right */
 .header-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    justify-content: flex-end;
 }
 
 .logo-small {
-    height: 35px;
+    height: 50px;
 }
 
 .nav-btn {
-    padding: 8px 15px;
+    padding: 15px 20px;
     text-decoration: none;
     border-radius: 6px;
     color: white;
     background: #007bff;
-    font-size: 13px;
+    font-size: 20px;
     font-weight: 600;
     transition: background 0.3s;
+    margin-top: 15px; /* added: space above Attendance button */
 }
 
 .nav-btn:hover {
@@ -125,16 +106,14 @@ body.dark-theme .student-reg {
     border-color: rgba(0, 123, 255, 0.3);
     transform: translateY(-2px);
 }
-
-.settings-navbar .nav-link.logout {
-    background: rgba(220, 53, 69, 0.1);
-    border-color: rgba(220, 53, 69, 0.2);
-    color: #dc3545;
-}
-
-.settings-navbar .nav-link.logout:hover {
-    background: rgba(220, 53, 69, 0.2);
-    border-color: #dc3545;
+.student-info {
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    gap: 4px;
+    margin-top: 10px;
 }
 
 /* Stats Blocks */
@@ -270,96 +249,6 @@ body.dark-theme .mini-block.not-marked {
 }
 
 /* ============================================
-   INTERVAL RECORDS (CARDS)
-   ============================================ */
-.interval-records-container {
-    margin-top: 30px;
-    background: var(--card-bg);
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: var(--shadow);
-}
-
-.interval-records-container h3 {
-    margin-top: 0;
-    margin-bottom: 20px;
-    color: var(--text);
-}
-
-.interval-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 15px;
-}
-
-.interval-card {
-    padding: 15px;
-    border-radius: 10px;
-    text-align: center;
-    border: 2px solid var(--border);
-    transition: all 0.3s ease;
-    background: var(--card-bg);
-}
-
-.interval-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-}
-
-.interval-card.present {
-    background: rgba(40, 167, 69, 0.1);
-    border-color: #28a745;
-    color: #28a745;
-}
-
-.interval-card.absent {
-    background: rgba(220, 53, 69, 0.1);
-    border-color: #dc3545;
-    color: #dc3545;
-}
-
-.interval-card.pending {
-    background: rgba(255, 193, 7, 0.1);
-    border-color: #ffc107;
-    color: #856404;
-}
-
-.interval-time {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 8px;
-}
-
-.interval-status {
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 8px;
-}
-
-.interval-marked {
-    font-size: 12px;
-    opacity: 0.8;
-}
-
-body.dark-theme .interval-card.present {
-    background: rgba(40, 167, 69, 0.25);
-    border-color: #28a745;
-    color: #6fcf97;
-}
-
-body.dark-theme .interval-card.absent {
-    background: rgba(220, 53, 69, 0.25);
-    border-color: #dc3545;
-    color: #f1948a;
-}
-
-body.dark-theme .interval-card.pending {
-    background: rgba(255, 193, 7, 0.25);
-    border-color: #ffc107;
-    color: #f9ca24;
-}
-
-/* ============================================
    CALENDAR – 6 COLUMNS (Mon–Sat)
    ============================================ */
 .calendar-container {
@@ -480,29 +369,29 @@ body.dark-theme .calendar-grid > div:nth-child(-n+6) {
 
 /* Block past dates – greyed out, non‑clickable */
 .calendar-day.past-date {
-    background: #e9ecef !important;
-    color: #adb5bd !important;
-    cursor: not-allowed !important;
+    background: #e9ecef ;
+    color: #adb5bd ;
+    cursor: not-allowed ;
     opacity: 0.6;
     pointer-events: none;
 }
 .calendar-day.past-date.Present {
-    background: #d4edda !important;
-    color: #6c757d !important;
+    background: #d4edda ;
+    color: #6c757d ;
 }
 .calendar-day.past-date.Absent {
-    background: #f8d7da !important;
-    color: #6c757d !important;
+    background: #f8d7da ;
+    color: #6c757d ;
 }
 body.dark-theme .calendar-day.past-date {
-    background: #2b2b2b !important;
-    color: #666 !important;
+    background: #2b2b2b ;
+    color: #666 ;
 }
 body.dark-theme .calendar-day.past-date.Present {
-    background: #1e3a2a !important;
+    background: #1e3a2a ;
 }
 body.dark-theme .calendar-day.past-date.Absent {
-    background: #3a1e1e !important;
+    background: #3a1e1e ;
 }
 
 /* Highlight selected date */
@@ -651,8 +540,99 @@ body.dark-theme .calendar-day.no-data {
 /* Accessibility: reduce motion */
 @media (prefers-reduced-motion: reduce) {
     * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms ;
+        animation-iteration-count: 1 ;
+        transition-duration: 0.01ms ;
     }
 }
+
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.06);
+    background: var(--card-bg);
+    color: var(--text);
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.12s ease;
+}
+.theme-toggle .icon { font-size: 1.05rem; }
+.theme-toggle:hover { transform: translateY(-2px); }
+.theme-toggle[aria-pressed="true"] {
+    background: var(--accent, #2f80ed);
+    color: #fff;
+    border-color: rgba(0,0,0,0.06);
+}
+
+.toggle-wrap {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+}
+
+/* on small screens keep toggle inside normal flow (e.g. header) */
+@ground {
+  .toggle-wrap {
+    position: static;
+    margin-left: 8px;
+  }
+}
+
+.theme-icon {
+  font-size: 1rem;
+  transition: transform 0.35s cubic-bezier(.34,1.56,.64,1), opacity 0.25s;
+  user-select: none;
+}
+
+.toggle-pill {
+  position: relative;
+  width: 50px;
+  height: 27px;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.toggle-pill input { display: none; }
+
+.pill-track {
+  position: absolute;
+  inset: 0;
+  background: var(--toggle-bg,#e6e6e6);
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pill-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  transition: transform 0.18s cubic-bezier(.2,.9,.3,1);
+}
+
+/* move knob when active */
+body.dark-theme .pill-knob { transform: translateX(23px); }
+
+/* Checked state */
+.toggle-pill input:checked + .pill-track { background: var(--accent, #2f80ed); }
+.toggle-pill input:checked + .pill-track + .pill-knob,
+.toggle-pill input:checked + .pill-track ~ .pill-knob {
+  transform: translateX(23px);
+}
+
+/* Ensure icons reflect theme in dark mode */
+body.dark-theme #sunIcon { opacity: 0.35; transform: rotate(-6deg); }
+body.dark-theme #moonIcon { opacity: 1; transform: rotate(0deg); }

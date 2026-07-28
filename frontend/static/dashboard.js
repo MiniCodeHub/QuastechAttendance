@@ -1,30 +1,62 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // --- Theme Functions ---
-    function initializeTheme() {
-        const savedTheme = localStorage.getItem('app-theme') || 'light';
+    // --- Theme toggle wiring (minimal, idempotent) ---
+    (function themeToggleInit(){
+        const KEY = 'quastech-theme';
         const body = document.body;
-        if (savedTheme === 'dark') {
-            body.classList.add('dark-theme');
-            body.classList.remove('light-theme');
-        } else {
-            body.classList.add('light-theme');
-            body.classList.remove('dark-theme');
+        const toggle = document.getElementById('themeToggle');
+        const sun = document.getElementById('sunIcon');
+        const moon = document.getElementById('moonIcon');
+
+        function applyTheme(isDark, save=true){
+            if (isDark) body.classList.add('dark-theme'); else body.classList.remove('dark-theme');
+            if (toggle) toggle.checked = !!isDark;
+            if (sun) sun.style.opacity = isDark ? '0.35' : '1';
+            if (moon) moon.style.opacity = isDark ? '1' : '0.35';
+            try { if (save) localStorage.setItem(KEY, isDark ? 'dark' : 'light'); } catch(e){}
         }
+
+        // restore or use system preference
+        try {
+            const saved = localStorage.getItem(KEY);
+            if (saved) applyTheme(saved === 'dark', false);
+            else applyTheme(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches, false);
+        } catch(e){
+            applyTheme(false, false);
+        }
+
+        if (toggle) {
+            toggle.addEventListener('change', function(){ applyTheme(this.checked); });
+        }
+    })();
+
+    // --- Theme Functions ---
+    const themeCheckbox = document.getElementById('themeToggle');
+    const sunIcon = document.getElementById('sunIcon');
+    const moonIcon = document.getElementById('moonIcon');
+
+    function applyTheme(isDark) {
+        const body = document.body;
+        if (isDark) body.classList.add('dark-theme'); else body.classList.remove('dark-theme');
+        try { localStorage.setItem('app-theme', isDark ? 'dark' : 'light'); } catch(e) {}
+        if (themeCheckbox) themeCheckbox.checked = !!isDark;
+        if (sunIcon) sunIcon.style.opacity = isDark ? '0.35' : '1';
+        if (moonIcon) moonIcon.style.opacity = isDark ? '1' : '0.35';
     }
 
-    window.toggleTheme = function() {
-        const body = document.body;
-        const isDark = body.classList.contains('dark-theme');
-        if (isDark) {
-            body.classList.remove('dark-theme');
-            body.classList.add('light-theme');
-            localStorage.setItem('app-theme', 'light');
-        } else {
-            body.classList.remove('light-theme');
-            body.classList.add('dark-theme');
-            localStorage.setItem('app-theme', 'dark');
-        }
-    };
+    function initializeTheme() {
+        let saved = null;
+        try { saved = localStorage.getItem('app-theme'); } catch(e) {}
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const isDark = saved === 'dark' || (saved === null && prefersDark);
+        applyTheme(isDark);
+    }
+
+    // wire up checkbox change (label clicks will toggle checkbox automatically)
+    if (themeCheckbox) {
+        themeCheckbox.addEventListener('change', function() {
+            applyTheme(this.checked);
+        });
+    }
 
     initializeTheme();
 
@@ -200,11 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const dayNum = document.createElement('div');
                         dayNum.className = 'day-number';
                         dayNum.textContent = day;
-                        const countSpan = document.createElement('div');
-                        countSpan.className = 'present-count';
-                        countSpan.textContent = `${info.present_count}h`;
                         cell.appendChild(dayNum);
-                        cell.appendChild(countSpan);
                     } else {
                         cell.textContent = day;
                         cell.classList.add('no-data');

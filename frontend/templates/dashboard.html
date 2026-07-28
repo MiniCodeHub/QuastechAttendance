@@ -10,54 +10,46 @@
 <div class="dashboard-container">
 
     <!-- Header -->
+    <div class="toggle-wrap">
+        <label class="toggle-pill" aria-hidden="true">
+            <input type="checkbox" id="themeToggle" />
+            <div class="pill-track"></div>
+            <div class="pill-knob" id="knob"></div>
+        </label>
+    </div>
     <div class="dashboard-header">
-        <div class="student-info">
-            <span class="student-name">👤 {{ student_name }}</span>
-            <span class="student-reg">ID: {{ reg_number }}</span>
-        </div>
-        <div class="header-right">
-            <a href="{{ url_for('attendance_page') }}" class="nav-btn" style="text-decoration: none;">📋 Attendance</a>
+        <div class="header-left">
             <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo-small">
         </div>
-    </div>
-
-    <!-- Settings Navbar -->
-    <div class="settings-navbar">
-        <div class="nav-links">
-            <a href="/profile" class="nav-link"><span>👤</span> Profile</a>
-            <a href="#" class="nav-link" onclick="toggleTheme(); return false;"><span>🎨</span> Theme</a>
-            <a href="/logout" class="nav-link logout"><span>🚪</span> Logout</a>
+        <div class="header-right">
+            <div class="student-info" onclick="window.location.href='/profile';">
+                <span class="student-name">👤 {{ student_name }}</span>
+                <span class="student-reg">ID: {{ reg_number }}</span>
+            </div>
+            <a href="{{ url_for('attendance_page') }}" class="nav-btn">📋 Attendance</a>
         </div>
     </div>
 
     <!-- Stats Blocks – Order: Present Hours → Absent → Total Hours -->
     <div class="stats-blocks">
-        <!-- 1st Block: Present Hours -->
+        <!-- 1st Block: Present Days -->
         <div class="stat-block present">
-            <h3>Present Hours</h3>
-            <p id="presentHoursDisplay">{{ stats.present_hours }}</p>
+            <h3>Present Days</h3>
+            <p id="presentDaysDisplay">{{ stats.present_days }}</p>
             <div class="mini-intervals" id="presentMiniBlocks"></div>
         </div>
 
         <!-- 2nd Block: Absent -->
         <div class="stat-block absent">
-            <h3>Absent Hours</h3>
+            <h3>Absent Days</h3>
             <p id="absentCount">{{ stats.absent }}</p>
             <div class="mini-intervals" id="absentMiniBlocks"></div>
         </div>
 
-        <!-- 3rd Block: Total Hours -->
+        <!-- 3rd Block: Total Days -->
         <div class="stat-block total">
-            <h3>Total Hours</h3>
-            <p id="totalHoursDisplay">{{ stats.total_hours }}</p>
-        </div>
-    </div>
-
-    <!-- Today's Interval Records -->
-    <div class="interval-records-container">
-        <h3>📊 Today's Attendance by Interval</h3>
-        <div class="interval-records" id="intervalRecords">
-            <p>Loading interval records...</p>
+            <h3>Total Days</h3>
+            <p id="totalDaysDisplay">{{ stats.total_days }}</p>
         </div>
     </div>
 

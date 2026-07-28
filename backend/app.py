@@ -87,10 +87,10 @@ def is_sunday(target_date):
     return False
 
 # ============================================================
-# AUTO-ABSENT (4 intervals, 8-12)
+# AUTO-ABSENT (daily, 11:00-12:00 attendance window)
 # ============================================================
-def mark_absent_for_interval(interval_num):
-    print(f"🔄 Running mark_absent_for_interval({interval_num}) at {datetime.now(IST)}")
+def mark_absent_for_today():
+    print(f"🔄 Running mark_absent_for_today at {datetime.now(IST)}")
     today = datetime.now(IST).date()
 
     if is_sunday(today):
@@ -101,47 +101,41 @@ def mark_absent_for_interval(interval_num):
     if not conn:
         print("❌ Database connection failed")
         return
+
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT registration_number FROM registrations")
             all_students = [row['registration_number'] for row in cur.fetchall()]
             print(f"📋 Total students: {len(all_students)}")
 
-            cur.execute("""
-                SELECT registration_number FROM attendance
-                WHERE date = %s AND interval_number = %s
-            """, (today, interval_num))
+            cur.execute("SELECT registration_number FROM attendance WHERE date = %s", (today,))
             marked = {row['registration_number'] for row in cur.fetchall()}
-            print(f"✅ Students who marked interval {interval_num}: {len(marked)}")
+            print(f"✅ Students who marked today: {len(marked)}")
 
-            now_time = datetime.now(IST).time()
             absent_count = 0
             for reg_num in all_students:
                 if reg_num not in marked:
                     cur.execute("""
-                        INSERT IGNORE INTO attendance
-                        (registration_number, date, time_in, status, device_fingerprint, interval_number)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (reg_num, today, now_time, 'Absent', 'auto_absent', interval_num))
+                        INSERT INTO attendance
+                        (registration_number, date, time_in, status, device_fingerprint)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (reg_num, today, time(0, 0), 'Absent', 'auto_absent'))
                     absent_count += 1
+
             conn.commit()
-            print(f"✅ Marked Absent for {absent_count} students in interval {interval_num} on {today}")
+            print(f"✅ Marked Absent for {absent_count} students for {today}")
     except Exception as e:
-        print(f"❌ Error marking absent for interval {interval_num}: {e}")
+        print(f"❌ Error marking absent for today: {e}")
     finally:
         conn.close()
 
-def backfill_past_intervals():
+def backfill_past_attendance():
     now = datetime.now(IST)
-    current_hour = now.hour
-    interval_end_hours = {1: 9, 2: 10, 3: 11, 4: 12}
-    print("⏳ Checking for past intervals to backfill...")
-    for interval, end_hour in interval_end_hours.items():
-        if current_hour >= end_hour:
-            print(f"⏳ Backfilling interval {interval} (ended at {end_hour}:00)")
-            mark_absent_for_interval(interval)
-        else:
-            print(f"⏳ Interval {interval} not yet ended (ends at {end_hour}:00)")
+    print("⏳ Checking whether today's attendance should be backfilled...")
+    if now.hour >= 12:
+        mark_absent_for_today()
+    else:
+        print("⏳ Attendance window not closed yet; no backfill required.")
 
 def cleanup_old_fingerprints():
     conn = get_db_connection()
@@ -297,15 +291,15 @@ def get_attendance_for_date():
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT interval_number, time_in, status 
+                SELECT time_in, status 
                 FROM attendance 
                 WHERE registration_number = %s AND date = %s
-                ORDER BY interval_number
+                ORDER BY id DESC
+                LIMIT 1
             """, (registration_number, target_date))
-            records = cur.fetchall()
+            record = cur.fetchone()
             attendance_status = {}
-            for record in records:
-                interval = record['interval_number']
+            if record:
                 time_in = record['time_in']
                 if isinstance(time_in, timedelta):
                     total_seconds = int(time_in.total_seconds())
@@ -317,14 +311,14 @@ def get_attendance_for_date():
                     time_str = time_in.strftime('%H:%M:%S')
                 else:
                     time_str = str(time_in) if time_in else ''
-                attendance_status[interval] = {
+                attendance_status = {
                     'time_in': time_str,
                     'status': record['status']
                 }
             return jsonify({
                 'success': True,
                 'attendance_status': attendance_status,
-                'marked_intervals': list(attendance_status.keys())
+                'marked': bool(record)
             })
     finally:
         conn.close()
@@ -562,35 +556,19 @@ def get_daily_attendance_status():
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT interval_number, time_in, status 
-                FROM attendance 
+                SELECT time_in, status
+                FROM attendance
                 WHERE registration_number = %s AND date = %s
-                ORDER BY interval_number
+                ORDER BY id DESC
+                LIMIT 1
             """, (registration_number, current_date))
-            records = cur.fetchall()
+            record = cur.fetchone()
             attendance_status = {}
-            for record in records:
-                interval = record['interval_number']
+            if record:
                 time_in = record['time_in']
-                if isinstance(time_in, timedelta):
-                    total_seconds = int(time_in.total_seconds())
-                    hours = total_seconds // 3600
-                    minutes = (total_seconds % 3600) // 60
-                    seconds = total_seconds % 60
-                    time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-                elif isinstance(time_in, time):
-                    time_str = time_in.strftime('%H:%M:%S')
-                else:
-                    time_str = str(time_in) if time_in else ''
-                attendance_status[interval] = {
-                    'time_in': time_str,
-                    'status': record['status']
-                }
-            return jsonify({
-                'success': True,
-                'attendance_status': attendance_status,
-                'marked_intervals': list(attendance_status.keys())
-            })
+                time_str = time_in.strftime('%H:%M:%S') if isinstance(time_in, time) else str(time_in or '')
+                attendance_status = {'time_in': time_str, 'status': record['status']}
+            return jsonify({'success': True, 'attendance_status': attendance_status, 'marked': bool(record)})
     finally:
         conn.close()
 
@@ -648,14 +626,10 @@ def mark_attendance():
     if distance > GPS_RADIUS_METERS:
         return jsonify({'success': False, 'message': f'You are not within college campus. Distance: {int(distance)} meters.'}), 400
 
-    if current_time < time(8, 0):
-        return jsonify({'success': False, 'message': 'Attendance window starts at 8:00 AM IST.'}), 400
+    if current_time < time(11, 0):
+        return jsonify({'success': False, 'message': 'Attendance window starts at 11:00 AM IST.'}), 400
     if current_time >= time(12, 0):
         return jsonify({'success': False, 'message': 'Attendance window closed at 12:00 PM IST.'}), 400
-
-    interval = get_interval_status(current_time)
-    if interval is None:
-        return jsonify({'success': False, 'message': 'Invalid attendance interval.'}), 400
 
     conn = get_db_connection()
     if not conn:
@@ -671,9 +645,11 @@ def mark_attendance():
                 return jsonify({'success': False, 'message': f"Student is in {student['year']}, not {year}."}), 400
 
             cur.execute("""
-                SELECT id, status, device_fingerprint FROM attendance 
-                WHERE registration_number = %s AND date = %s AND interval_number = %s
-            """, (registration_number, current_date, interval))
+                SELECT id, status, device_fingerprint 
+                FROM attendance
+                WHERE registration_number = %s AND date = %s
+                LIMIT 1
+            """, (registration_number, current_date))
             existing = cur.fetchone()
 
             if existing:
@@ -686,38 +662,35 @@ def mark_attendance():
                     conn.commit()
                     return jsonify({
                         'success': True,
-                        'message': f'Attendance updated to Present for interval {interval} (overrode auto-absent).',
-                        'interval': interval,
+                        'message': 'Attendance updated to Present for today.',
                         'status': 'Present'
-                    })
-                else:
-                    return jsonify({'success': False, 'message': f'Attendance already marked for interval {interval}.'}), 400
+                    }), 200
+
+                return jsonify({'success': False, 'message': 'Attendance already marked for today.'}), 400
 
             cur.execute("""
-                SELECT registration_number FROM attendance 
-                WHERE device_fingerprint = %s AND date = %s AND interval_number = %s
-            """, (device_fingerprint, current_date, interval))
+                SELECT registration_number FROM attendance
+                WHERE device_fingerprint = %s AND date = %s
+            """, (device_fingerprint, current_date))
             existing_device = cur.fetchone()
             if existing_device and existing_device['registration_number'] != registration_number:
-                return jsonify({'success': False, 'message': f'This device has already been used for interval {interval} today.'}), 400
+                return jsonify({'success': False, 'message': 'This device has already been used for attendance today.'}), 400
 
             cur.execute("""
-                INSERT INTO attendance 
-                (registration_number, date, time_in, status, device_fingerprint, interval_number) 
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (registration_number, current_date, current_time, 'Present', device_fingerprint, interval))
+                INSERT INTO attendance
+                (registration_number, date, time_in, status, device_fingerprint)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (registration_number, current_date, current_time, 'Present', device_fingerprint))
             conn.commit()
 
             return jsonify({
                 'success': True,
-                'message': f'Attendance marked for interval {interval} (hour {interval + 7}:00 - {interval + 8}:00).',
-                'interval': interval,
+                'message': 'Attendance marked for today.',
                 'status': 'Present'
-            })
-
+            }), 200
     except Exception as e:
         print(f"❌ Mark attendance error: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'An error occurred while marking attendance.'}), 500
     finally:
         conn.close()
 
@@ -1111,24 +1084,15 @@ def test_absent(interval):
 # --- SCHEDULER (4 intervals) ---
 scheduler = BackgroundScheduler(timezone=IST)
 
-interval_end_times = [
-    (1, 9, 0),
-    (2, 10, 0),
-    (3, 11, 0),
-    (4, 12, 0)
-]
-
-for interval, hour, minute in interval_end_times:
-    scheduler.add_job(
-        mark_absent_for_interval,
-        'cron',
-        hour=hour,
-        minute=minute,
-        args=[interval],
-        timezone=IST,
-        id=f'absent_interval_{interval}'
-    )
-    print(f"📅 Scheduled absent for interval {interval} at {hour:02d}:{minute:02d} IST")
+scheduler.add_job(
+    mark_absent_for_today,
+    'cron',
+    hour=12,
+    minute=0,
+    timezone=IST,
+    id='absent_for_today'
+)
+print("📅 Scheduled absent for today at 12:00 IST")
 
 scheduler.add_job(
     cleanup_old_fingerprints,
@@ -1145,5 +1109,5 @@ for job in scheduler.get_jobs():
     print(f"  - {job.id} | next run: {job.next_run_time}")
 
 if __name__ == '__main__':
-    backfill_past_intervals()
+    backfill_past_attendance()
     app.run(debug=False, host='0.0.0.0', port=5000)

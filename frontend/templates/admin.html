@@ -157,18 +157,6 @@
     </div>
 
     <!-- Modals -->
-    <div id="intervalModal" class="modal">
-        <div class="modal-content">
-            <button class="close" onclick="closeModal('intervalModal')">&times;</button>
-            <h2>📅 Today's Interval Records</h2>
-            <p id="studentNameDisplay"></p>
-            <div id="intervalRecords" class="interval-grid-admin"></div>
-            <div class="modal-buttons">
-                <button class="btn-cancel" onclick="closeModal('intervalModal')">Close</button>
-            </div>
-        </div>
-    </div>
-
     <div id="resetPasswordModal" class="modal">
         <div class="modal-content">
             <button class="close" onclick="closeModal('resetPasswordModal')">&times;</button>
@@ -244,41 +232,6 @@
                 row.style.display = (regNo.includes(searchTerm) || name.includes(searchTerm)) ? '' : 'none';
             });
         });
-
-        // View Intervals
-        async function viewIntervals(regNumber) {
-            try {
-                const response = await fetch(`/admin/student_interval_records?reg_number=${regNumber}`);
-                const data = await response.json();
-
-                if (data.success) {
-                    const recordsDiv = document.getElementById('intervalRecords');
-                    recordsDiv.innerHTML = '';
-
-                    if (Object.keys(data.records).length === 0) {
-                        recordsDiv.innerHTML = '<p style="text-align: center; color: #999;">No attendance marked today</p>';
-                    } else {
-                        Object.entries(data.records).forEach(([interval, record]) => {
-                            const statusClass = record.status.toLowerCase();
-                            recordsDiv.innerHTML += `
-                                <div class="interval-card-admin ${statusClass}">
-                                    <div class="interval-time">Interval ${interval}</div>
-                                    <div class="interval-status">${record.status}</div>
-                                    <div class="interval-marked">${record.time_in}</div>
-                                </div>
-                            `;
-                        });
-                    }
-
-                    const studentName = document.querySelector(`tr[data-reg-number="${regNumber}"] td:nth-child(2)`).textContent;
-                    document.getElementById('studentNameDisplay').textContent = `📝 ${studentName} (${regNumber})`;
-                    document.getElementById('intervalModal').classList.add('show');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to load interval records');
-            }
-        }
 
         // Reset Password
         function resetPassword(regNumber, name) {

@@ -71,7 +71,10 @@ body {
     color: #0f62ff;
     letter-spacing: .18rem;
 }
-
+.logout{
+    text-decoration: none;
+    
+}
 .tagline {
     margin-top: 4px;
     font-size: 13px;
