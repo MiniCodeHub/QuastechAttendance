@@ -281,16 +281,6 @@ th {
 
 /* Buttons inside table */
 
-.btn-reset {
-    background: #f59e0b;
-    color: #fff;
-    margin-right: 6px;
-}
-
-.btn-reset:hover {
-    background: #d97706;
-}
-
 .btn-delete {
     background: #dc2626;
     color: #fff;

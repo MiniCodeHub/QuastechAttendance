@@ -80,7 +80,6 @@
                                         </td>
                                         <td data-label="Actions">
                                             <div class="action-buttons">
-                                                <button class="btn btn-reset" onclick="resetPassword('{{ reg.registration_number }}', '{{ reg.name }}')">Reset</button>
                                                 <button class="btn btn-delete" onclick="deleteStudent('{{ reg.registration_number }}', '{{ reg.name }}')">Delete</button>
                                             </div>
                                         </td>
@@ -199,6 +198,43 @@
             <div class="modal-buttons">
                 <button class="btn-confirm" id="confirmDeleteBtn" onclick="confirmDelete()" disabled>Delete</button>
                 <button class="btn-cancel" onclick="closeModal('deleteModal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editStudentModal" class="modal">
+        <div class="modal-content">
+            <button class="close" onclick="closeModal('editStudentModal')">&times;</button>
+            <h2>✏️ Edit Student Details</h2>
+
+            <label>Registration Number</label>
+            <input type="text" id="editRegNumber" readonly>
+
+            <label>Name</label>
+            <input type="text" id="editStudentName" placeholder="Enter student name">
+
+            <label>Mobile</label>
+            <input type="text" id="editMobile" placeholder="Enter 10-digit mobile">
+
+            <label>Year</label>
+            <select id="editYear">
+                <option value="FYBCA">FYBCA</option>
+                <option value="SYBCA">SYBCA</option>
+                <option value="TYBCA">TYBCA</option>
+            </select>
+
+            <label>Course</label>
+            <input type="text" id="editCourse" placeholder="Enter course (e.g. BCA)">
+
+            <label>New Password</label>
+            <input type="password" id="editNewPassword" placeholder="Leave blank to keep current password">
+
+            <label>Confirm Password</label>
+            <input type="password" id="editConfirmPassword" placeholder="Confirm new password">
+
+            <div class="modal-buttons">
+                <button class="btn btn-confirm" onclick="confirmEditStudent()">Save</button>
+                <button class="btn btn-cancel" onclick="closeModal('editStudentModal')">Cancel</button>
             </div>
         </div>
     </div>

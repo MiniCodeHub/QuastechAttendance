@@ -632,6 +632,7 @@ async function searchStudents() {
         const registrationsTable = document.getElementById("registrationsTable");
         if (registrationsTable) {
             registrationsTable.innerHTML = html;
+            attachEditButtons();
         }
 
     } catch (error) {
@@ -647,3 +648,122 @@ function viewIntervalRecords(regNumber, studentName) {
 function closeIntervalModal() {
     closeModal('intervalModal');
 }
+
+function attachEditButtons() {
+    const rows = document.querySelectorAll('#tableBody tr, #registrationsTable tr');
+
+    rows.forEach(row => {
+        if (row.querySelector('.btn-edit')) return;
+
+        const regNumber = (row.getAttribute('data-reg-number') || row.cells?.[0]?.textContent?.trim() || '').trim();
+        if (!regNumber) return;
+
+        row.setAttribute('data-reg-number', regNumber);
+
+        const actionCell = row.querySelector('td:last-child');
+        if (!actionCell) return;
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'btn btn-edit';
+        editBtn.textContent = '✏️ Edit';
+
+        editBtn.onclick = () => {
+            const name = (row.cells[1]?.textContent || '').trim();
+            const mobile = (row.cells[2]?.textContent || '').trim();
+            const year = (row.cells[3]?.textContent || '').trim();
+            const course = (row.cells[4]?.textContent || '').trim();
+
+            editStudent(regNumber, name, mobile, year, course);
+        };
+
+        actionCell.appendChild(editBtn);
+    });
+}
+
+function editStudent(regNumber, name, mobile, year, course) {
+    currentRegNumber = regNumber;
+
+    document.getElementById('editRegNumber').value = regNumber || '';
+    document.getElementById('editStudentName').value = name || '';
+    document.getElementById('editMobile').value = mobile || '';
+    document.getElementById('editYear').value = year || 'FYBCA';
+    document.getElementById('editCourse').value = course || 'BCA';
+    document.getElementById('editNewPassword').value = '';
+    document.getElementById('editConfirmPassword').value = '';
+
+    const modal = document.getElementById('editStudentModal');
+    if (modal) {
+        modal.classList.add('show');
+    }
+}
+
+async function confirmEditStudent() {
+    const regNumber = currentRegNumber;
+    const name = document.getElementById('editStudentName').value.trim();
+    const mobile = document.getElementById('editMobile').value.trim();
+    const year = document.getElementById('editYear').value;
+    const course = document.getElementById('editCourse').value.trim();
+    const newPassword = document.getElementById('editNewPassword').value;
+    const confirmPassword = document.getElementById('editConfirmPassword').value;
+
+    if (!name) {
+        alert('Please enter a student name.');
+        return;
+    }
+
+    if (!mobile || mobile.length !== 10 || !/^\d+$/.test(mobile)) {
+        alert('Mobile number must be 10 digits.');
+        return;
+    }
+
+    if (newPassword || confirmPassword) {
+        if (newPassword.length < 6) {
+            alert('Password must be at least 6 characters.');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            alert('Passwords do not match.');
+            return;
+        }
+    }
+
+    try {
+        const response = await fetch('/admin/update_student', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                registration_number: regNumber,
+                name,
+                mobile,
+                year,
+                course,
+                new_password: newPassword,
+                confirm_password: confirmPassword
+            })
+        });
+
+        const text = await response.text();
+        let data = {};
+        try {
+            data = JSON.parse(text);
+        } catch {
+            data = { success: false, message: text };
+        }
+
+        if (data.success) {
+            alert('✅ Student updated successfully.');
+            closeModal('editStudentModal');
+            location.reload();
+        } else {
+            alert('❌ ' + (data.message || 'Failed to update student.'));
+        }
+    } catch (error) {
+        console.error(error);
+        alert('❌ Server error while updating student.');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    attachEditButtons();
+});

@@ -864,13 +864,42 @@ def admin_reset_all_data():
     finally:
         conn.close()
 
-@app.route('/admin/student_interval_records')
-def admin_student_interval_records():
+@app.route('/admin/update_student', methods=['POST'])
+def admin_update_student():
     if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'message': 'Not authorized'}), 401
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
 
-    reg_number = request.args.get('reg_number', '').strip()
-    current_date = datetime.now(IST).date()
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+    else:
+        data = request.form.to_dict()
+
+    reg_number = str(data.get('registration_number', '') or '').strip()
+    name = str(data.get('name', '') or '').strip()
+    mobile = str(data.get('mobile', '') or '').strip()
+    year = str(data.get('year', '') or '').strip()
+    course = str(data.get('course', '') or '').strip() or 'BCA'
+    new_password = str(data.get('new_password', '') or '').strip()
+    confirm_password = str(data.get('confirm_password', '') or '').strip()
+
+    if not reg_number:
+        return jsonify({'success': False, 'message': 'Registration number is required'}), 400
+    if not name:
+        return jsonify({'success': False, 'message': 'Name is required'}), 400
+    if len(mobile) != 10 or not mobile.isdigit():
+        return jsonify({'success': False, 'message': 'Mobile number must be 10 digits'}), 400
+
+    year_map = {'1': 'FYBCA', '2': 'SYBCA', '3': 'TYBCA'}
+    year_value = year_map.get(year, year).strip()
+
+    if year_value not in {'FYBCA', 'SYBCA', 'TYBCA'}:
+        return jsonify({'success': False, 'message': 'Invalid year'}), 400
+
+    if new_password or confirm_password:
+        if len(new_password) < 6:
+            return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
+        if new_password != confirm_password:
+            return jsonify({'success': False, 'message': 'Passwords do not match'}), 400
 
     conn = get_db_connection()
     if not conn:
@@ -878,38 +907,29 @@ def admin_student_interval_records():
 
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, time_in, status
-                FROM attendance
-                WHERE registration_number = %s AND date = %s
-                ORDER BY id
-            """, (reg_number, current_date))
+            cur.execute("SELECT id FROM registrations WHERE registration_number = %s", (reg_number,))
+            if not cur.fetchone():
+                return jsonify({'success': False, 'message': 'Student not found'}), 404
 
-            records = cur.fetchall()
-            interval_records = {}
+            if new_password:
+                cur.execute("""
+                    UPDATE registrations
+                    SET name = %s, mobile = %s, year = %s, course = %s, password = %s
+                    WHERE registration_number = %s
+                """, (name, mobile, year_value, course, new_password, reg_number))
+            else:
+                cur.execute("""
+                    UPDATE registrations
+                    SET name = %s, mobile = %s, year = %s, course = %s
+                    WHERE registration_number = %s
+                """, (name, mobile, year_value, course, reg_number))
 
-            for idx, record in enumerate(records, start=1):
-                time_in = record['time_in']
-                if isinstance(time_in, timedelta):
-                    total_seconds = int(time_in.total_seconds())
-                    hours = total_seconds // 3600
-                    minutes = (total_seconds % 3600) // 60
-                    seconds = total_seconds % 60
-                    time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-                elif isinstance(time_in, time):
-                    time_str = time_in.strftime('%H:%M:%S')
-                else:
-                    time_str = str(time_in) if time_in else ''
+            conn.commit()
 
-                interval_records[idx] = {
-                    'time_in': time_str,
-                    'status': record['status']
-                }
-
-            return jsonify({
-                'success': True,
-                'records': interval_records
-            })
+        return jsonify({'success': True, 'message': 'Student details updated successfully'})
+    except Exception as e:
+        print(f"Update student error: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         conn.close()
 
@@ -1073,7 +1093,6 @@ def download_full_report():
         download_name=f'attendance_report_{datetime.now(IST).strftime("%Y%m%d_%H%M%S")}.xlsx'
     )
 
-# --- MANUAL TRIGGER (debugging) ---
 # --- MANUAL TRIGGER (debugging) ---
 @app.route('/test_absent')
 def test_absent():
