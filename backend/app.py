@@ -868,23 +868,27 @@ def admin_reset_all_data():
 def admin_student_interval_records():
     if not session.get('admin_logged_in'):
         return jsonify({'success': False, 'message': 'Not authorized'}), 401
+
     reg_number = request.args.get('reg_number', '').strip()
     current_date = datetime.now(IST).date()
+
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT interval_number, time_in, status 
-                FROM attendance 
+                SELECT id, time_in, status
+                FROM attendance
                 WHERE registration_number = %s AND date = %s
-                ORDER BY interval_number
+                ORDER BY id
             """, (reg_number, current_date))
+
             records = cur.fetchall()
             interval_records = {}
-            for record in records:
-                interval = record['interval_number']
+
+            for idx, record in enumerate(records, start=1):
                 time_in = record['time_in']
                 if isinstance(time_in, timedelta):
                     total_seconds = int(time_in.total_seconds())
@@ -896,10 +900,12 @@ def admin_student_interval_records():
                     time_str = time_in.strftime('%H:%M:%S')
                 else:
                     time_str = str(time_in) if time_in else ''
-                interval_records[interval] = {
+
+                interval_records[idx] = {
                     'time_in': time_str,
                     'status': record['status']
                 }
+
             return jsonify({
                 'success': True,
                 'records': interval_records
@@ -929,7 +935,7 @@ def download_full_report():
             registrations = cur.fetchall()
 
             cur.execute("""
-                SELECT registration_number, date, time_in, status, interval_number, device_fingerprint
+                SELECT registration_number, date, time_in, status, device_fingerprint
                 FROM attendance
                 WHERE DAYOFWEEK(date) <> 1
                 ORDER BY date, registration_number
@@ -954,16 +960,13 @@ def download_full_report():
             weekly_data = cur.fetchall()
 
             cur.execute("""
-                SELECT interval_number,
-                       COUNT(CASE WHEN status = 'Present' THEN 1 END) as present_total,
-                       COUNT(CASE WHEN status = 'Absent' THEN 1 END) as absent_total
+                SELECT
+                    COUNT(CASE WHEN status = 'Present' THEN 1 END) as present_total,
+                    COUNT(CASE WHEN status = 'Absent' THEN 1 END) as absent_total
                 FROM attendance
-                WHERE interval_number IS NOT NULL
-                  AND DAYOFWEEK(date) <> 1
-                GROUP BY interval_number
-                ORDER BY interval_number
+                WHERE DAYOFWEEK(date) <> 1
             """)
-            interval_summary = cur.fetchall()
+            status_summary = cur.fetchone()
 
     except Exception as e:
         print(f"Error fetching data: {e}")
@@ -997,7 +1000,7 @@ def download_full_report():
     # SHEET 2: Attendance (all records)
     # ============================================================
     ws2 = wb.create_sheet("Attendance")
-    headers2 = ['Registration Number', 'Date', 'Time In', 'Status', 'Interval Number', 'Device Fingerprint']
+    headers2 = ['Registration Number', 'Date', 'Time In', 'Status', 'Device Fingerprint']
     ws2.append(headers2)
     for rec in attendance_records:
         time_in = rec['time_in']
@@ -1016,10 +1019,9 @@ def download_full_report():
             rec['date'].strftime('%Y-%m-%d') if rec['date'] else '',
             time_str,
             rec['status'],
-            rec['interval_number'],
             rec['device_fingerprint'] or ''
         ])
-    for col in range(1, 7):
+    for col in range(1, 6):
         ws2.column_dimensions[chr(64 + col)].width = 18
 
     # ============================================================
@@ -1040,22 +1042,21 @@ def download_full_report():
         att_pct = round(present / total * 100, 2) if total > 0 else 0
         ws3.append([name, reg_num, year, month, week, present, absent, total, att_pct])
 
-    # Optionally add auto-filter for convenience (but not required)
-    # ws3.auto_filter.ref = ws3.dimensions
-
     for col in range(1, 10):
         ws3.column_dimensions[chr(64 + col)].width = 15
 
     # ============================================================
-    # SHEET 4: Interval Analysis (data only, no chart)
+    # SHEET 4: Status Summary
     # ============================================================
-    ws4 = wb.create_sheet("Interval Analysis")
-    headers4 = ['Interval', 'Present Count', 'Absent Count']
+    ws4 = wb.create_sheet("Status Summary")
+    headers4 = ['Present Count', 'Absent Count']
     ws4.append(headers4)
-    for row in interval_summary:
-        ws4.append([f"Interval {row['interval_number']}", row['present_total'], row['absent_total']])
+    ws4.append([
+        status_summary['present_total'] or 0,
+        status_summary['absent_total'] or 0
+    ])
 
-    for col in range(1, 4):
+    for col in range(1, 3):
         ws4.column_dimensions[chr(64 + col)].width = 18
 
     # ============================================================
@@ -1073,13 +1074,11 @@ def download_full_report():
     )
 
 # --- MANUAL TRIGGER (debugging) ---
-@app.route('/test_absent/<int:interval>')
-def test_absent(interval):
-    if 1 <= interval <= 4:
-        mark_absent_for_interval(interval)
-        return f"✅ Manually triggered absent for interval {interval}"
-    else:
-        return "❌ Invalid interval (1-4)"
+# --- MANUAL TRIGGER (debugging) ---
+@app.route('/test_absent')
+def test_absent():
+    mark_absent_for_today()
+    return "✅ Manually triggered absent processing"
 
 # --- SCHEDULER (4 intervals) ---
 scheduler = BackgroundScheduler(timezone=IST)

@@ -286,30 +286,95 @@ async function loadAttendanceData() {
 }
 
 function updateAttendanceTable(attendanceData) {
-    // Process and display attendance data based on your backend response
     const attendanceBody = document.getElementById('attendanceBody');
     if (!attendanceBody) return;
 
-    // This function updates the attendance table with data from the backend
-    // Implementation depends on your specific database structure
-    console.log('Attendance data loaded:', attendanceData);
+    attendanceBody.innerHTML = '';
+
+    const rows = Array.isArray(attendanceData) ? attendanceData : [];
+
+    if (rows.length === 0) {
+        attendanceBody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align:center;color:#999;">No attendance data found</td>
+            </tr>
+        `;
+        return;
+    }
+
+    rows.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'attendance-row';
+
+        const year = (item.year || item.student_year || '').toString().trim();
+        const course = (item.course || 'BCA').toString().trim();
+        const session = (item.session || '2025-26').toString().trim();
+
+        row.setAttribute('data-year', year);
+        row.setAttribute('data-course', course);
+        row.setAttribute('data-session', session);
+
+        const present = Number(item.present_count || item.total_present || 0);
+        const absent = Number(item.absent_count || item.total_absent || 0);
+        const total = present + absent;
+        const percent = total > 0 ? `${Math.round((present / total) * 100)}%` : '0%';
+
+        row.innerHTML = `
+            <td data-label="Reg No">${item.registration_number || ''}</td>
+            <td data-label="Name">${item.name || ''}</td>
+            <td data-label="Year">${year}</td>
+            <td data-label="Session">${session}</td>
+            <td data-label="Total Present" class="present-count">${present}</td>
+            <td data-label="Total Absent" class="absent-count">${absent}</td>
+            <td data-label="Attendance %" class="attendance-percent">${percent}</td>
+        `;
+
+        attendanceBody.appendChild(row);
+    });
+
+    filterAttendance();
 }
 
 function filterAttendance() {
-    const year = document.getElementById('yearFilter').value;
-    const course = document.getElementById('courseFilter').value;
-    const session = document.getElementById('sessionFilter').value;
+    const yearFilter = document.getElementById('yearFilter');
+    const courseFilter = document.getElementById('courseFilter');
+    const sessionFilter = document.getElementById('sessionFilter');
 
-    const attendanceRows = document.querySelectorAll('.attendance-row');
-    attendanceRows.forEach(row => {
-        const rowYear = row.getAttribute('data-year');
-        const rowCourse = row.getAttribute('data-course');
+    if (!yearFilter || !courseFilter || !sessionFilter) return;
 
-        const yearMatch = !year || rowYear === year;
-        const courseMatch = !course || rowCourse === course;
+    const selectedYear = normalizeYearValue(yearFilter.value);
+    const selectedCourse = (courseFilter.value || '').trim().toUpperCase();
+    const selectedSession = (sessionFilter.value || '').trim();
 
-        row.style.display = (yearMatch && courseMatch) ? '' : 'none';
+    document.querySelectorAll('.attendance-row').forEach(row => {
+        const rowYear = normalizeYearValue(row.getAttribute('data-year'));
+        const rowCourse = (row.getAttribute('data-course') || '').trim().toUpperCase();
+        const rowSession = (row.getAttribute('data-session') || '').trim();
+
+        const yearMatch = !selectedYear || rowYear === selectedYear;
+        const courseMatch = !selectedCourse || rowCourse === selectedCourse;
+        const sessionMatch = !selectedSession || rowSession === selectedSession;
+
+        row.style.display = (yearMatch && courseMatch && sessionMatch) ? '' : 'none';
     });
+}
+
+function normalizeYearValue(value = '') {
+    const normalized = String(value || '').trim().toUpperCase();
+
+    const aliases = {
+        '1ST YEAR': 'FYBCA',
+        'FIRST YEAR': 'FYBCA',
+        'FY': 'FYBCA',
+        '2ND YEAR': 'SYBCA',
+        'SECOND YEAR': 'SYBCA',
+        'SY': 'SYBCA',
+        '3RD YEAR': 'TYBCA',
+        'THIRD YEAR': 'TYBCA',
+        'TY': 'TYBCA'
+    };
+
+    return aliases[normalized] || normalized;
 }
 
 // =====================

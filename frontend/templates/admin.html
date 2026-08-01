@@ -101,9 +101,9 @@
                 <div class="attendance-filters">
                     <select id="yearFilter" onchange="filterAttendance()">
                         <option value="">Select Year</option>
-                        <option value="1st Year">1st Year</option>
-                        <option value="2nd Year">2nd Year</option>
-                        <option value="3rd Year">3rd Year</option>
+                        <option value="FYBCA">FYBCA</option>
+                        <option value="SYBCA">SYBCA</option>
+                        <option value="TYBCA">TYBCA</option>
                     </select>
                     <select id="courseFilter" onchange="filterAttendance()">
                         <option value="">Select Course</option>
@@ -133,7 +133,10 @@
                         <tbody id="attendanceBody">
                             {% if registrations %}
                                 {% for reg in registrations %}
-                                    <tr class="attendance-row" data-year="{{ reg.year }}" data-course="{{ reg.course or 'BCA' }}">
+                                    <tr class="attendance-row"
+                                        data-year="{{ reg.year }}"
+                                        data-course="{{ reg.course or 'BCA' }}"
+                                        data-session="2025-26">
                                         <td data-label="Reg No">{{ reg.registration_number }}</td>
                                         <td data-label="Name">{{ reg.name }}</td>
                                         <td data-label="Year">{{ reg.year }}</td>
@@ -200,183 +203,6 @@
         </div>
     </div>
 
-    <script>
-        let currentRegNumber = '';
-        let deleteOption = '';
-        let currentDeleteType = '';
-
-        // Toggle Views
-        document.querySelectorAll('.toggle-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                
-                const view = this.getAttribute('data-view');
-                document.querySelectorAll('.view-section').forEach(section => {
-                    section.style.display = 'none';
-                });
-                document.getElementById(view + '-view').style.display = 'block';
-                
-                if (view === 'attendance') {
-                    loadAttendanceData();
-                }
-            });
-        });
-
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('keyup', function() {
-            const searchTerm = this.value.toLowerCase();
-            document.querySelectorAll('#tableBody tr').forEach(row => {
-                const regNo = row.getAttribute('data-reg-number').toLowerCase();
-                const name = row.cells[1].textContent.toLowerCase();
-                row.style.display = (regNo.includes(searchTerm) || name.includes(searchTerm)) ? '' : 'none';
-            });
-        });
-
-        // Reset Password
-        function resetPassword(regNumber, name) {
-            currentRegNumber = regNumber;
-            document.getElementById('studentName').value = name;
-            document.getElementById('newPassword').value = '123456';
-            document.getElementById('resetPasswordModal').classList.add('show');
-        }
-
-        async function confirmResetPassword() {
-            const newPassword = document.getElementById('newPassword').value.trim();
-
-            if (!newPassword || newPassword.length < 6) {
-                alert('Password must be at least 6 characters');
-                return;
-            }
-
-            try {
-                const response = await fetch('/admin/reset_password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        registration_number: currentRegNumber,
-                        new_password: newPassword
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    alert(`✅ Password reset successfully!\nNew Password: ${data.new_password}`);
-                    closeModal('resetPasswordModal');
-                } else {
-                    alert('❌ ' + data.message);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to reset password');
-            }
-        }
-
-        // Delete Student
-        function deleteStudent(regNumber, name) {
-            currentRegNumber = regNumber;
-            deleteOption = '';
-            currentDeleteType = '';
-            document.getElementById('deleteStudentInfo').innerHTML = `<strong>${name}</strong> (${regNumber})`;
-            document.getElementById('confirmDeleteMessage').style.display = 'none';
-            document.getElementById('confirmDeleteBtn').disabled = true;
-            document.querySelectorAll('.reset-option').forEach(opt => opt.classList.remove('selected'));
-            document.getElementById('deleteModal').classList.add('show');
-        }
-
-        function selectDeleteOption(element, type) {
-            document.querySelectorAll('.reset-option').forEach(opt => opt.classList.remove('selected'));
-            element.classList.add('selected');
-            currentDeleteType = type;
-            document.getElementById('confirmDeleteMessage').style.display = 'block';
-            document.getElementById('confirmDeleteBtn').disabled = false;
-        }
-
-        async function confirmDelete() {
-            if (!currentDeleteType) {
-                alert('Please select an option');
-                return;
-            }
-
-            let endpoint, body;
-
-            if (currentDeleteType === 'attendance') {
-                endpoint = '/admin/reset_attendance';
-                body = { registration_number: currentRegNumber };
-            } else if (currentDeleteType === 'all') {
-                endpoint = '/admin/reset_all_data';
-                body = { registration_number: currentRegNumber, confirm: true };
-            }
-
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    alert('✅ ' + data.message);
-                    closeModal('deleteModal');
-                    location.reload();
-                } else {
-                    alert('❌ ' + data.message);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to process delete request');
-            }
-        }
-
-        // Load Attendance Data
-        async function loadAttendanceData() {
-            try {
-                const response = await fetch('/api/get_all_attendance');
-                const data = await response.json();
-
-                if (data.success) {
-                    // Process and display attendance data
-                    updateAttendanceTable(data.attendance);
-                }
-            } catch (error) {
-                console.error('Error loading attendance:', error);
-            }
-        }
-
-        function updateAttendanceTable(attendanceData) {
-            // This would update the attendance table with data from the backend
-            // Implementation depends on your database structure
-        }
-
-        function filterAttendance() {
-            const year = document.getElementById('yearFilter').value;
-            const course = document.getElementById('courseFilter').value;
-            const session = document.getElementById('sessionFilter').value;
-
-            document.querySelectorAll('.attendance-row').forEach(row => {
-                const rowYear = row.getAttribute('data-year');
-                const rowCourse = row.getAttribute('data-course');
-
-                const yearMatch = !year || rowYear === year;
-                const courseMatch = !course || rowCourse === course;
-
-                row.style.display = (yearMatch && courseMatch) ? '' : 'none';
-            });
-        }
-
-        // Modal Functions
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('show');
-        }
-
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.classList.remove('show');
-            }
-        }
-    </script>
+    <script src="{{ url_for('static', filename='admin.js') }}"></script>
 </body>
 </html>
