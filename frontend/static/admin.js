@@ -4,9 +4,47 @@ let currentDeleteType = '';
 let resetRegNumber = "";
 let selectedResetType = "";
 
-// =====================
-// TOGGLE VIEWS
-// =====================
+// read server-provided current session from DOM (set in template)
+function getCurrentSessionFromDOM() {
+    try {
+        const val = document.body?.dataset?.currentSession;
+        if (val) return val.toString().trim();
+    } catch {}
+    return null;
+}
+
+// compute academic session (Jul 1 - Jun 30) for a given Date object
+function computeAcademicSessionForDate(d) {
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    let startYear;
+    if (month >= 7) {
+        startYear = year;
+    } else {
+        startYear = year - 1;
+    }
+    const endYear = startYear + 1;
+    return `${startYear}-${String(endYear).slice(-2)}`;
+}
+
+// generate list of sessions (current and previous N-1 sessions)
+function generateSessionOptions(currentSession, count = 4) {
+    const sessions = [];
+    let startYear;
+    const m = currentSession.match(/^(\d{4})/);
+    if (m) startYear = parseInt(m[1], 10);
+    else {
+        // fallback to current date
+        const cs = computeAcademicSessionForDate(new Date());
+        startYear = parseInt(cs.split('-')[0], 10);
+    }
+    for (let i = 0; i < count; i++) {
+        const sy = startYear - i;
+        const ey = sy + 1;
+        sessions.push(`${sy}-${String(ey).slice(-2)}`);
+    }
+    return sessions;
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     // Toggle Views
@@ -27,6 +65,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // populate session filter dynamically
+    const sessionFilter = document.getElementById('sessionFilter');
+    const currentSessionDOM = getCurrentSessionFromDOM();
+    const currentSession = currentSessionDOM || computeAcademicSessionForDate(new Date());
+    if (sessionFilter) {
+        sessionFilter.innerHTML = '<option value="">Select Session</option>';
+        const options = generateSessionOptions(currentSession, 6);
+        options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt;
+            o.textContent = opt;
+            sessionFilter.appendChild(o);
+        });
+        // set default to current session
+        sessionFilter.value = currentSession;
+        sessionFilter.addEventListener('change', filterAttendance);
+    }
+
     // Search functionality
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
@@ -44,6 +100,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    attachEditButtons();
 });
 
 // =====================
@@ -302,13 +360,16 @@ function updateAttendanceTable(attendanceData) {
         return;
     }
 
+    const currentSessionFromDOM = getCurrentSessionFromDOM();
+    const fallbackCurrentSession = currentSessionFromDOM || computeAcademicSessionForDate(new Date());
+
     rows.forEach(item => {
         const row = document.createElement('tr');
         row.className = 'attendance-row';
 
         const year = (item.year || item.student_year || '').toString().trim();
         const course = (item.course || 'BCA').toString().trim();
-        const session = (item.session || '2025-26').toString().trim();
+        const session = (item.session || item.academic_session || fallbackCurrentSession).toString().trim();
 
         row.setAttribute('data-year', year);
         row.setAttribute('data-course', course);

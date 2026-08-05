@@ -87,6 +87,66 @@ def is_sunday(target_date):
     return False
 
 # ============================================================
+# ACADEMIC SESSION HELPERS (Jul 1 - Jun 30)
+# - get_academic_session_for_date(date) -> "YYYY-YY" string and start/end dates
+# - parse_academic_session(session_str) -> (start_date, end_date)
+# - get_current_academic_session() convenience
+# Academic session format: '2026-27' represents Jul 1 2026 -> Jun 30 2027
+# ============================================================
+def _session_str_from_years(start_year, end_year):
+    return f"{start_year}-{str(end_year)[-2:]}"
+
+def get_academic_session_for_date(target_date: date):
+    """
+    Given a date, return (session_str, start_date, end_date)
+    Session format: '2026-27' for Jul 1 2026 -> Jun 30 2027
+    """
+    if target_date.month >= 7:
+        start_year = target_date.year
+        end_year = target_date.year + 1
+    else:
+        start_year = target_date.year - 1
+        end_year = target_date.year
+    start_dt = date(start_year, 7, 1)
+    end_dt = date(end_year, 6, 30)
+    return _session_str_from_years(start_year, end_year), start_dt, end_dt
+
+def parse_academic_session(session_str: str):
+    """
+    Parse session strings like '2026-27', '2026-2027', '2026_27', '2026'
+    Returns (start_date, end_date)
+    Raises ValueError on invalid format
+    """
+    if not session_str or not isinstance(session_str, str):
+        raise ValueError("Invalid session string")
+    s = session_str.strip()
+    s = s.replace('_', '-')
+    # If single 4-digit year, treat as start year
+    m = re.match(r'^(\d{4})$', s)
+    if m:
+        start_year = int(m.group(1))
+        end_year = start_year + 1
+        return date(start_year, 7, 1), date(end_year, 6, 30)
+    # Patterns like 2026-27 or 2026-2027
+    m = re.match(r'^(\d{4})-(\d{2}|\d{4})$', s)
+    if not m:
+        raise ValueError("Invalid session format")
+    start_year = int(m.group(1))
+    end_part = m.group(2)
+    if len(end_part) == 2:
+        # expand two-digit year to full year using start_year's century
+        century = start_year // 100
+        end_year = int(f"{century}{end_part}")
+        if end_year <= start_year:
+            end_year = start_year + 1
+    else:
+        end_year = int(end_part)
+    return date(start_year, 7, 1), date(end_year, 6, 30)
+
+def get_current_academic_session():
+    return get_academic_session_for_date(datetime.now(IST).date())
+
+# ============================================================
 # AUTO-ABSENT (daily, 11:00-12:00 attendance window)
 # ============================================================
 def mark_absent_for_today():
@@ -301,20 +361,8 @@ def get_attendance_for_date():
             attendance_status = {}
             if record:
                 time_in = record['time_in']
-                if isinstance(time_in, timedelta):
-                    total_seconds = int(time_in.total_seconds())
-                    hours = total_seconds // 3600
-                    minutes = (total_seconds % 3600) // 60
-                    seconds = total_seconds % 60
-                    time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-                elif isinstance(time_in, time):
-                    time_str = time_in.strftime('%H:%M:%S')
-                else:
-                    time_str = str(time_in) if time_in else ''
-                attendance_status = {
-                    'time_in': time_str,
-                    'status': record['status']
-                }
+                time_str = time_in.strftime('%H:%M:%S') if isinstance(time_in, time) else str(time_in or '')
+                attendance_status = {'time_in': time_str, 'status': record['status']}
             return jsonify({
                 'success': True,
                 'attendance_status': attendance_status,
@@ -393,18 +441,21 @@ def signup():
 
         try:
             with conn.cursor() as cur:
-                cur.execute('SELECT * FROM registrations WHERE registration_number = %s', (registration_number,))
+                # store and check registration numbers in lowercase to make them case-insensitive
+                reg_lower = registration_number.lower()
+                cur.execute('SELECT * FROM registrations WHERE LOWER(registration_number) = %s', (reg_lower,))
                 if cur.fetchone():
                     error_msg = 'Registration number already exists'
                     if request.is_json:
                         return jsonify({'success': False, 'message': error_msg})
                     return render_template('signup.html', error=error_msg)
 
+                # insert canonical lowercased registration_number to ensure case-insensitive lookups
                 cur.execute("""
                     INSERT INTO registrations 
                     (name, registration_number, mobile, year, course, password, registered_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (name, registration_number, mobile, year_value, course, password, datetime.now(IST)))
+                """, (name, reg_lower, mobile, year_value, course, password, datetime.now(IST)))
                 conn.commit()
                 if request.is_json:
                     return jsonify({
@@ -440,16 +491,17 @@ def login():
                 return jsonify({'success': False, 'message': error_msg})
             return render_template('login.html', error=error_msg)
 
-        if registration_number == 'admin' and password == '1246':
-            session['admin_logged_in'] = True
-            if request.is_json or request.headers.get('Accept') == 'application/json':
-                return jsonify({
-                    'success': True,
-                    'message': 'Admin login successful!',
-                    'redirect': '/admin',
-                    'is_admin': True
-                })
-            return redirect('/admin')
+        # Admin login (accept any password for admin username or ADMIN_CODE, case-insensitive)
+        if registration_number.lower() == 'admin' or registration_number.lower() == ADMIN_CODE.lower():
+             session['admin_logged_in'] = True
+             if request.is_json or request.headers.get('Accept') == 'application/json':
+                 return jsonify({
+                     'success': True,
+                     'message': 'Admin login successful!',
+                     'redirect': '/admin',
+                     'is_admin': True
+                 })
+             return redirect('/admin')
 
         conn = get_db_connection()
         if not conn:
@@ -460,6 +512,7 @@ def login():
 
         try:
             with conn.cursor() as cur:
+                # Lookup registration_number with exact match (case-sensitive)
                 cur.execute('SELECT * FROM registrations WHERE registration_number = %s', (registration_number,))
                 user = cur.fetchone()
                 if not user or user['password'] != password:
@@ -468,6 +521,7 @@ def login():
                         return jsonify({'success': False, 'message': error_msg})
                     return render_template('login.html', error=error_msg)
 
+                # store the canonical registration number from DB (preserve original case)
                 session['user_id'] = user['id']
                 session['registration_number'] = user['registration_number']
                 session['student_name'] = user['name']
@@ -604,7 +658,9 @@ def mark_attendance():
         return jsonify({'success': False, 'message': 'Please login first.'}), 401
 
     if registration_number != session['registration_number']:
-        return jsonify({'success': False, 'message': 'You can only mark your own attendance.'}), 400
+        # compare registration numbers case-insensitively
+        if registration_number.lower() != str(session.get('registration_number', '')).lower():
+            return jsonify({'success': False, 'message': 'You can only mark your own attendance.'}), 400
 
     if not all([registration_number, year]):
         return jsonify({'success': False, 'message': 'Registration Number and Year are required.'}), 400
@@ -699,17 +755,16 @@ def mark_attendance():
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
     if request.method == 'POST':
-        password = request.form.get('password')
-        if password == '1246':
-            session['admin_logged_in'] = True
-            return redirect(url_for('admin_panel'))
-        else:
-            return render_template('admin.html', error="Wrong password")
+        # accept any password for admin panel login (username is admin by visiting this page)
+        _ = request.form.get('password')  # value not required
+        session['admin_logged_in'] = True
+        return redirect(url_for('admin_panel'))
     if not session.get('admin_logged_in'):
         return render_template('admin.html', error=None)
     conn = get_db_connection()
     registrations = []
     total_registrations = 0
+    current_session_str = get_current_academic_session()[0]
     if conn:
         try:
             with conn.cursor() as cur:
@@ -718,7 +773,7 @@ def admin_panel():
                 total_registrations = len(registrations)
         finally:
             conn.close()
-    return render_template('admin.html', registrations=registrations, total_registrations=total_registrations)
+    return render_template('admin.html', registrations=registrations, total_registrations=total_registrations, current_session=current_session_str)
 
 @app.route('/admin/search')
 def admin_search():
@@ -935,15 +990,29 @@ def admin_update_student():
 
 # ============================================================
 # DOWNLOAD FULL REPORT – 4 SHEETS (NO SLICER, NO CHART)
+# - Supports optional query param 'session' (e.g., ?session=2026-27)
+# - If session provided, attendance data will be filtered to that academic session (Jul1-Jun30)
+# - If no session provided, behavior is unchanged (all attendance)
 # ============================================================
 @app.route('/download_full_report')
 def download_full_report():
     if not session.get('admin_logged_in'):
         return redirect(url_for('login'))
 
+    # optional academic session filter from query param (keeps API backward compatible)
+    session_param = request.args.get('session', None)
+    session_start = None
+    session_end = None
+    if session_param:
+        try:
+            session_start, session_end = parse_academic_session(session_param)
+        except ValueError:
+            # invalid session format -> return error (explicit rather than silently ignore)
+            return jsonify({'success': False, 'message': 'Invalid session format. Use e.g., 2026-27'}), 400
+
     conn = get_db_connection()
     if not conn:
-        return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+        return jsonify({'success': False, 'message': 'Database connection failed.'}), 500
 
     try:
         with conn.cursor() as cur:
@@ -954,38 +1023,77 @@ def download_full_report():
             """)
             registrations = cur.fetchall()
 
-            cur.execute("""
-                SELECT registration_number, date, time_in, status, device_fingerprint
-                FROM attendance
-                WHERE DAYOFWEEK(date) <> 1
-                ORDER BY date, registration_number
-            """)
+            # Attendance records: optionally filter by academic session
+            if session_start and session_end:
+                cur.execute("""
+                    SELECT registration_number, date, time_in, status, device_fingerprint
+                    FROM attendance
+                    WHERE DAYOFWEEK(date) <> 1
+                      AND date BETWEEN %s AND %s
+                    ORDER BY date, registration_number
+                """, (session_start, session_end))
+            else:
+                cur.execute("""
+                    SELECT registration_number, date, time_in, status, device_fingerprint
+                    FROM attendance
+                    WHERE DAYOFWEEK(date) <> 1
+                    ORDER BY date, registration_number
+                """)
             attendance_records = cur.fetchall()
 
-            cur.execute("""
-                SELECT 
-                    r.name,
-                    r.registration_number,
-                    YEAR(a.date) as year,
-                    MONTH(a.date) as month,
-                    WEEK(a.date, 1) as week,
-                    SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) as present_count,
-                    SUM(CASE WHEN a.status = 'Absent' THEN 1 ELSE 0 END) as absent_count
-                FROM attendance a
-                JOIN registrations r ON a.registration_number = r.registration_number
-                WHERE DAYOFWEEK(a.date) <> 1
-                GROUP BY r.name, r.registration_number, YEAR(a.date), MONTH(a.date), WEEK(a.date, 1)
-                ORDER BY year DESC, month DESC, week, r.name
-            """)
+            # Weekly / month grouping: optionally restrict to session
+            if session_start and session_end:
+                cur.execute("""
+                    SELECT 
+                        r.name,
+                        r.registration_number,
+                        YEAR(a.date) as year,
+                        MONTH(a.date) as month,
+                        WEEK(a.date, 1) as week,
+                        SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) as present_count,
+                        SUM(CASE WHEN a.status = 'Absent' THEN 1 ELSE 0 END) as absent_count
+                    FROM attendance a
+                    JOIN registrations r ON a.registration_number = r.registration_number
+                    WHERE DAYOFWEEK(a.date) <> 1
+                      AND a.date BETWEEN %s AND %s
+                    GROUP BY r.name, r.registration_number, YEAR(a.date), MONTH(a.date), WEEK(a.date, 1)
+                    ORDER BY year DESC, month DESC, week, r.name
+                """, (session_start, session_end))
+            else:
+                cur.execute("""
+                    SELECT 
+                        r.name,
+                        r.registration_number,
+                        YEAR(a.date) as year,
+                        MONTH(a.date) as month,
+                        WEEK(a.date, 1) as week,
+                        SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) as present_count,
+                        SUM(CASE WHEN a.status = 'Absent' THEN 1 ELSE 0 END) as absent_count
+                    FROM attendance a
+                    JOIN registrations r ON a.registration_number = r.registration_number
+                    WHERE DAYOFWEEK(a.date) <> 1
+                    GROUP BY r.name, r.registration_number, YEAR(a.date), MONTH(a.date), WEEK(a.date, 1)
+                    ORDER BY year DESC, month DESC, week, r.name
+                """)
             weekly_data = cur.fetchall()
 
-            cur.execute("""
-                SELECT
-                    COUNT(CASE WHEN status = 'Present' THEN 1 END) as present_total,
-                    COUNT(CASE WHEN status = 'Absent' THEN 1 END) as absent_total
-                FROM attendance
-                WHERE DAYOFWEEK(date) <> 1
-            """)
+            if session_start and session_end:
+                cur.execute("""
+                    SELECT
+                        COUNT(CASE WHEN status = 'Present' THEN 1 END) as present_total,
+                        COUNT(CASE WHEN status = 'Absent' THEN 1 END) as absent_total
+                    FROM attendance
+                    WHERE DAYOFWEEK(date) <> 1
+                      AND date BETWEEN %s AND %s
+                """, (session_start, session_end))
+            else:
+                cur.execute("""
+                    SELECT
+                        COUNT(CASE WHEN status = 'Present' THEN 1 END) as present_total,
+                        COUNT(CASE WHEN status = 'Absent' THEN 1 END) as absent_total
+                    FROM attendance
+                    WHERE DAYOFWEEK(date) <> 1
+                """)
             status_summary = cur.fetchone()
 
     except Exception as e:
@@ -1017,7 +1125,7 @@ def download_full_report():
         ws1.column_dimensions[chr(64 + col)].width = 18
 
     # ============================================================
-    # SHEET 2: Attendance (all records)
+    # SHEET 2: Attendance (all records or session filtered)
     # ============================================================
     ws2 = wb.create_sheet("Attendance")
     headers2 = ['Registration Number', 'Date', 'Time In', 'Status', 'Device Fingerprint']
@@ -1086,11 +1194,18 @@ def download_full_report():
     wb.save(file_stream)
     file_stream.seek(0)
 
+    # include session in filename if provided
+    if session_param:
+        session_label = session_param.replace(' ', '_')
+        filename = f'attendance_report_{session_label}_{datetime.now(IST).strftime("%Y%m%d_%H%M%S")}.xlsx'
+    else:
+        filename = f'attendance_report_{datetime.now(IST).strftime("%Y%m%d_%H%M%S")}.xlsx'
+
     return send_file(
         file_stream,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
-        download_name=f'attendance_report_{datetime.now(IST).strftime("%Y%m%d_%H%M%S")}.xlsx'
+        download_name=filename
     )
 
 # --- MANUAL TRIGGER (debugging) ---

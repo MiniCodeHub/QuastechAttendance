@@ -6,7 +6,7 @@
     <title>Admin Panel - Attendance System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
 </head>
-<body>
+<body data-current-session="{{ current_session }}">
     <div class="container">
         {% if not session.get('admin_logged_in') %}
             <div class="login-box">
@@ -109,10 +109,7 @@
                         <option value="BCA">BCA</option>
                     </select>
                     <select id="sessionFilter" onchange="filterAttendance()">
-                        <option value="">Select Session</option>
-                        <option value="2024-25">2024-25</option>
-                        <option value="2025-26">2025-26</option>
-                        <option value="2026-27">2026-27</option>
+                        <option value="">{{ current_session }}</option>
                     </select>
                 </div>
 
@@ -135,11 +132,11 @@
                                     <tr class="attendance-row"
                                         data-year="{{ reg.year }}"
                                         data-course="{{ reg.course or 'BCA' }}"
-                                        data-session="2025-26">
+                                        data-session="{{ current_session }}">
                                         <td data-label="Reg No">{{ reg.registration_number }}</td>
                                         <td data-label="Name">{{ reg.name }}</td>
                                         <td data-label="Year">{{ reg.year }}</td>
-                                        <td data-label="Session">2025-26</td>
+                                        <td data-label="Session">{{ current_session }}</td>
                                         <td data-label="Total Present" class="present-count">0</td>
                                         <td data-label="Total Absent" class="absent-count">0</td>
                                         <td data-label="Attendance %" class="attendance-percent">0%</td>
